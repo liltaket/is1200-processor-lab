@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-30T19:04:36Z",
+  "title": "Design System: IS1200 Processor Lab",
+  "extensions": {
+    "colorMeta": {
+      "canvas": { "role": "neutral", "displayName": "Instrument Canvas", "canonical": "#101318", "tonalRamp": ["#07080a", "#0b0d11", "#101318", "#20232a", "#41454d", "#686d77", "#9a9faa", "#d5d9e0"] },
+      "surface": { "role": "neutral", "displayName": "Slate Surface", "canonical": "#181d25", "tonalRamp": ["#090b0e", "#101319", "#181d25", "#292f39", "#4d5562", "#757f8d", "#aab2bf", "#dce0e6"] },
+      "surface-raised": { "role": "neutral", "displayName": "Raised Slate", "canonical": "#202733", "tonalRamp": ["#0b0e12", "#151a22", "#202733", "#333d4d", "#586376", "#828b9a", "#b3bac5", "#e0e3e8"] },
+      "border": { "role": "neutral", "displayName": "Quiet Border", "canonical": "#303946", "tonalRamp": ["#11151b", "#202630", "#303946", "#46515f", "#687382", "#8c96a3", "#b6bdc7", "#e0e3e8"] },
+      "text": { "role": "neutral", "displayName": "Readable Frost", "canonical": "#e8edf3", "tonalRamp": ["#11151b", "#252a32", "#414751", "#626a76", "#89919d", "#b0b7c1", "#d0d5dc", "#e8edf3"] },
+      "muted": { "role": "neutral", "displayName": "Muted Slate Text", "canonical": "#a4afbd", "tonalRamp": ["#11151b", "#242a32", "#404752", "#626b78", "#87919e", "#a4afbd", "#c6ccd4", "#e4e7eb"] },
+      "data-blue": { "role": "primary", "displayName": "Signal Blue", "canonical": "#9dc3ef", "tonalRamp": ["#10151c", "#1d2938", "#30445d", "#496484", "#6889ac", "#87acd3", "#9dc3ef", "#dcecff"] },
+      "control-amber": { "role": "secondary", "displayName": "Control Amber", "canonical": "#e5bb79", "tonalRamp": ["#19130b", "#302516", "#4d3a20", "#73552d", "#9b713e", "#c39455", "#e5bb79", "#f5e1bd"] },
+      "state-lilac": { "role": "tertiary", "displayName": "State Lilac", "canonical": "#c7b5eb", "tonalRamp": ["#15121b", "#282333", "#403752", "#5d4f76", "#7c6b9b", "#a08bc2", "#c7b5eb", "#eee7fb"] },
+      "success-green": { "role": "secondary", "displayName": "Success Green", "canonical": "#a5d4b7", "tonalRamp": ["#0e1711", "#1c2d22", "#2d4937", "#42684e", "#5d896b", "#7eb28f", "#a5d4b7", "#e0f3e7"] },
+      "error-red": { "role": "secondary", "displayName": "Error Red", "canonical": "#f3aaa5", "tonalRamp": ["#1a1010", "#321e1d", "#50302e", "#754642", "#a2605a", "#ca827b", "#f3aaa5", "#fbe4e2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "System Display", "purpose": "Page headings in the workbench." },
+      "body": { "displayName": "System Sans", "purpose": "Instructional prose and interface labels." },
+      "label": { "displayName": "Compact Label", "purpose": "Field labels, phase markers, and compact metadata." },
+      "mono": { "displayName": "Machine Mono", "purpose": "Instruction text, addresses, encoded values, and code." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-transition", "value": "0.15s", "purpose": "Brief color and surface changes on buttons, navigation, and diagram nodes." },
+      { "name": "progress-transition", "value": "0.2s", "purpose": "Short progress indicator updates." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Disable transitions and animations when requested by the user." }
+    ],
+    "breakpoints": [
+      { "name": "wide", "value": "1700px" },
+      { "name": "manual-stack", "value": "1060px" },
+      { "name": "tablet-nav", "value": "760px" },
+      { "name": "small-screen", "value": "420px" },
+      { "name": "study-stack", "value": "850px" },
+      { "name": "trainer-stack", "value": "680px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main confirm or advance action in a learning step.",
+      "html": "<button class=\"ds-button-primary\">Check answer</button>",
+      "css": ".ds-button-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 14px; border: 1px solid #a9c5e6; border-radius: 7px; background: #a9c5e6; color: #13253a; font: 550 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-button-primary:hover:not(:disabled) { background: #c4d7ee; border-color: #c4d7ee; } .ds-button-primary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A supporting action that should remain visually quieter than the main action.",
+      "html": "<button class=\"ds-button-secondary\">Show explanation</button>",
+      "css": ".ds-button-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 14px; border: 1px solid #465365; border-radius: 7px; background: transparent; color: #c8d3e3; font: 550 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-button-secondary:hover:not(:disabled) { background: #354357; } .ds-button-secondary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A compact dark field for numeric values and short answers.",
+      "html": "<label class=\"ds-field\"><span>Immediate value</span><input placeholder=\"-4\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; color: #c1cdde; font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input { min-width: 0; min-height: 40px; padding: 10px 12px; border: 1px solid #465365; border-radius: 7px; background: #11161e; color: #e5ecf7; font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input::placeholder { color: #9aa8bc; } .ds-field input:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 2px; }"
+    },
+    {
+      "name": "Topic Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "A topic link in the persistent course navigation.",
+      "html": "<a class=\"ds-nav-item\" href=\"#datapath\">Datapath</a>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: 10px; min-height: 39px; padding: 9px 11px; border-radius: 7px; color: #aeb8c7; font: 400 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-decoration: none; transition: background .15s, color .15s; } .ds-nav-item:hover { background: #212833; color: #fff; } .ds-nav-item[aria-current='page'] { background: #283547; color: #e0ebfb; } .ds-nav-item:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+    },
+    {
+      "name": "Learning Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "A flat work surface for an exercise or processor subsystem.",
+      "html": "<section class=\"ds-panel\"><h2>Register file</h2><p>Two combinational reads, one clocked write.</p></section>",
+      "css": ".ds-panel { padding: 22px; border: 1px solid #2d3541; border-radius: 12px; background: #181d25; color: #e8edf3; } .ds-panel h2 { margin: 0 0 10px; color: #e8edf3; font: 550 15px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-panel p { margin: 0; color: #a4afbd; font: 400 13px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-panel:hover { border-color: #3c4858; } .ds-panel:focus-within { border-color: #526780; }"
+    },
+    {
+      "name": "Semantic Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "A compact label for a machine concept or state.",
+      "html": "<span class=\"ds-chip\">ALUControl</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 5px; background: #273140; color: #c4d4e9; font: 500 11px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-chip:hover { background: #344056; color: #dae7f8; } .ds-chip:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
+    },
+    {
+      "name": "Datapath Signal Key",
+      "kind": "custom",
+      "description": "The recurring visual key for editable data, control, and state paths.",
+      "html": "<div class=\"ds-signal-key\"><span><i class=\"ds-data-wire\"></i>Data</span><span><i class=\"ds-control-wire\"></i>Control</span><span><i class=\"ds-state-node\"></i>State</span></div>",
+      "css": ".ds-signal-key { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; color: #aeb9c9; font: 400 10px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-signal-key > span { display: inline-flex; align-items: center; gap: 5px; } .ds-data-wire { display: inline-block; width: 12px; height: 2px; background: #93b5d8; } .ds-control-wire { display: inline-block; width: 12px; height: 0; border-top: 1px dashed #d6b281; } .ds-state-node { display: inline-block; width: 8px; height: 8px; border: 1px solid #bda6da; border-radius: 2px; } .ds-signal-key > span:hover { color: #e8edf3; } .ds-signal-key:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Processor Workbench",
+    "overview": "The interface feels like a focused technical instrument: dark slate surfaces recede behind the datapath, readable labels, and live values. Its visual hierarchy follows the work itself—read an instruction, follow its signals, then distinguish the clocked state change. The tone stays quiet so students can reason through the mechanism without decorative competition.\n\nColor carries meaning across the actual diagrams and learning modes. Blue marks data paths and the primary action; amber marks control; lilac marks sequential state. Responsive layouts keep navigation and guided work available on narrow screens, while the datapath remains a wide, pannable diagram when it cannot fit. Motion is brief and reduced when the user requests it.",
+    "keyCharacteristics": [
+      "Dark slate instrument surfaces with restrained borders.",
+      "Blue data, amber control, and lilac state cues.",
+      "Dense technical detail with readable hierarchy and horizontally pannable diagrams."
+    ],
+    "rules": [
+      { "name": "The Signal Meaning Rule", "body": "Keep blue on data, amber on control, and lilac on sequential state; do not exchange these roles for decoration.", "section": "colors" },
+      { "name": "The Value-Type Rule", "body": "Render machine values in monospace so they stay visually distinct from their explanation.", "section": "typography" },
+      { "name": "The Tonal Layer Rule", "body": "Establish depth with surface tone and quiet borders; do not add shadows as a substitute for clear grouping.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the dark instrument palette and the established blue, amber, and lilac signal roles.",
+      "Do keep machine values in monospace and explanation text in the system sans-serif.",
+      "Do let the work area adapt to the actual viewport; preserve a pannable datapath when needed.",
+      "Do keep keyboard focus visible and respect reduced-motion preferences."
+    ],
+    "donts": [
+      "Don't introduce a light theme, neon overload, or distracting gamification; the product contract commits to a dark, calm learning environment.",
+      "Don't blur data, control, and sequential-state color roles.",
+      "Don't compress the datapath into unreadable labels on narrow screens."
+    ]
+  }
+}
