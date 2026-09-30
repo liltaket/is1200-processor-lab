@@ -30,6 +30,11 @@ Downloads/lab4-processor-design.pdf (12 pages, 2026), lecture9.pdf (43 pages), r
 - Reason through the hardware; explain why every answer is correct.
 - Keep encoded instruction fields distinct from generated control signals.
 - Show combinational calculations separately from clocked state updates.
+- Keep learning task-first and use concise, noncritical helper copy; keep course identity subordinate to the work.
+- Welcome learners with one clear Open lab action before topic navigation.
+- Practice does not reveal answer hints automatically; learners check or request an answer explicitly.
+- Instruction-field placement supports pointer drag, tap selection, and keyboard operation.
+- Keep example, progress, and supporting help details closed until the learner opens them; show a scroll cue only when an instruction strip overflows.
 - Prioritize working, coherent learning modes over feature count.
 - Preserve course scope and identify authored examples.
 

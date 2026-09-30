@@ -1,0 +1,33 @@
+.manual-layout{grid-template-columns:minmax(0,1fr) 360px;align-items:start;gap:20px}
+.manual-layout>.schematic-panel{grid-column:1;grid-row:1}
+.manual-layout>.answer-panel{grid-column:2;grid-row:1 / span 2;padding:24px}
+.manual-layout>.register-state{grid-column:1;grid-row:2}
+.manual-layout .step-counter,.diagram-legend,.state-boundary,.register-cell small{font-size:14px}
+.manual-layout .step-counter{margin:0 0 14px}
+.manual-layout .answer-panel h2{font-size:23px;line-height:1.35;margin:24px 0}
+.manual-layout .choice{min-height:48px;font-size:14px;padding:12px}
+.manual-layout .feedback{font-size:14px;line-height:1.6}
+.manual-layout .register-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.manual-layout .register-cell{padding:12px}
+.manual-layout .register-cell code{font-size:16px}
+.manual-layout .register-cell>div>span{font-size:15px}
+.manual-layout .register-heading h2{font-size:18px}
+.manual-layout .state-boundary{padding:12px 16px}
+.manual-layout .reveal-button{min-height:44px;font-size:14px}
+.manual-layout .node-label{font-size:16px}
+.manual-layout .node-note{font-size:12px}
+.manual-layout .wire-label,.manual-layout .port-note{font-size:11px}
+.manual-layout .wire-value{font-size:15px}
+@media(max-width:1100px){
+ .manual-layout{grid-template-columns:minmax(0,1fr)}
+ .manual-layout>.answer-panel{grid-column:1;grid-row:1}
+ .manual-layout>.register-state{grid-column:1;grid-row:2}
+ .manual-layout>.schematic-panel{grid-column:1;grid-row:3}
+ .manual-layout .register-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ .manual-layout>.answer-panel{padding:20px}
+ .manual-layout .answer-panel h2{font-size:21px}
+ .manual-layout .register-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .manual-layout .step-counter{font-size:14px}
+}

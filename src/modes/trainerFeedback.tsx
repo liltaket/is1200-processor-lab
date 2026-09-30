@@ -58,10 +58,9 @@ export function Feedback({ grade }: { grade: Grade | null }) {
   return (
     <div className={cls} role="status" aria-live="polite">
       <strong>{status}</strong>
-      {!grade.revealed && <span className="trainer-feedback-score">{grade.counted ? 'Check recorded' : 'Practice round · not scored'}</span>}
+      {!grade.revealed && !grade.counted && <span className="trainer-feedback-score">Practice · not scored</span>}
       <p><b>Expected:</b> {grade.expected}</p>
-      <p><b>Why:</b> {grade.explanation}</p>
-      <p><b>Component:</b> {grade.component}</p>
+      <p>{grade.explanation}</p>
     </div>
   );
 }

@@ -8,14 +8,16 @@ An interactive study workbench for KTH IS1200 Lab 4 – Processor Design. Decode
 
 ## Learning modes
 
-- **Manual datapath:** work through a complete `add`, `addi`, or `beq` cycle. Unknown signals become visible as you solve them; stored state changes only when you apply the clock edge. Click or keyboard-activate components to explore their roles.
-- **Instruction formats and assembly encoding:** place R/I/B fields, then build an instruction through format, opcode, operands, field placement, and hexadecimal word stages. Guided field hints are unscored.
+- **Manual datapath:** work through a complete `add`, `addi`, or `beq` cycle. Predict the decode and signals before applying the clock edge; stored state changes only at that edge. Click or keyboard-activate components to explore their roles.
+- **Instruction formats and assembly encoding:** place R/I/B fields, then build an instruction through format, opcode, operands, field placement, and hexadecimal word stages. The available fields are alphabetized; place them onto their bit ranges by pointer drag, field selection plus tap, or keyboard activation with Enter. The bit strip scrolls inside its own frame; a visible cue appears when it overflows, and B-type keeps single-bit targets wide enough to select. Practice keeps field hints hidden until you explicitly reveal an answer. Guided lesson cues are unscored.
 - **Control, register file, and ALU:** derive generated controls, experiment with immediate reads and pending writes, and predict 32-bit arithmetic/logic results. Subtraction shows conditional XOR inversion and carry-in.
 - **Branches, clocking, and PC/ROM:** distinguish Branch from Branch AND Zero, derive both PC paths, classify timing events, and convert byte PC addresses to word indices.
 - **Factorial/program trace:** edit assembly or import assembly/hex words, step or run a bounded program, and predict register results across instruction edges.
 - **Oral preparation:** explain 32 source-linked prompts in your own words and self-assess against expected concepts. Lab 4 and Lecture 9 scopes are separate.
 
-Practice accuracy is saved locally. Mixed review selects less-practiced or lower-accuracy subjects; answers revealed or retried after feedback do not earn additional correct attempts. Mobile diagrams and instruction strips scroll within their panels.
+Start at the welcome screen and choose **Open lab** to begin; a few topic shortcuts are also available there. Each workbench view has one page heading and places the current task before supporting explanation. Practice asks for a prediction before feedback; answer details appear after checking or an explicit reveal. Practice accuracy is saved locally. Mixed review selects less-practiced or lower-accuracy subjects; answers revealed or retried after feedback do not earn additional correct attempts. On small screens, topic navigation, Mixed review, and closed Progress details are in the expandable **Topics** menu.
+
+In Factorial/program trace, choose an example input, inspect the processor state, then tick one rising edge or run to the stop loop. The authored example explanation is inside the closed **Example program** disclosure; edge details appear after the first tick. **Edit program** and **Predict future state** also start closed. Mobile datapaths, instruction strips, and wide prediction tables scroll inside their own panels.
 
 ## Local development
 
@@ -71,7 +73,7 @@ See [source analysis](docs/SOURCE_ANALYSIS.md), [learning plan](docs/LEARNING_PL
 
 ## Validation
 
-The local acceptance run passed 38 unit tests, 23 Chromium browser tests, strict TypeScript checking, ESLint, and the production build. Browser coverage includes a complete manual cycle, x0, signed overflow, B immediate fragments, correct and incorrect field placement, program import, factorial 0/3/8, saved and blocked storage, and keyboard navigation. All 11 views were checked for document overflow at 390 px and 1024 px. Desktop, tablet, and mobile screenshots received an independent visual review; the three findings were corrected.
+The local acceptance run passed 38 unit tests, 29 Chromium browser tests, strict TypeScript checking, ESLint, and the production build. Browser coverage includes a complete manual cycle, x0, signed overflow, B immediate fragments, correct and incorrect field placement, program import, factorial 0/3/8, saved and blocked storage, and keyboard navigation. All 11 views were checked for document overflow at 390 px and 1024 px. Desktop, tablet, and mobile screenshots received an independent visual review; the remaining field-scroll discovery finding was corrected and the final verdict was clear.
 
 A separate production build with `/subpath-check/` was served by a plain static HTTP server. All 11 hash destinations loaded and survived refresh with assets inside the subpath. This validates static routing locally. The deployment workflow validates the published revision on GitHub before releasing the Pages artifact. See [correctness review](docs/CORRECTNESS_REVIEW.md), [UX review](docs/UX_REVIEW.md), and [design system](DESIGN.md).
 

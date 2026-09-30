@@ -1,0 +1,356 @@
+.instruction-guided-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  margin-top: 7px;
+  padding: 4px 9px;
+  border: 1px solid #65573f;
+  border-radius: 999px;
+  background: #2b261f;
+  color: #e9c98f;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.instruction-field-placement {
+  position: relative;
+  min-width: 0;
+  margin: 15px 0 0;
+}
+
+.instruction-placement-help {
+  margin: 0 0 11px;
+  color: #c1ccda;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.instruction-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.instruction-field-bank {
+  min-width: 0;
+  margin-bottom: 12px;
+  padding: 11px 13px;
+  border: 1px solid #354253;
+  border-radius: 8px;
+  background: #151b23;
+}
+
+.instruction-field-bank-items {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+}
+
+.instruction-field-chip {
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #53647a;
+  border-radius: 7px;
+  background: #202a37;
+  color: #d6e3f3;
+  font-size: 14px;
+  font-weight: 550;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.instruction-field-chip:hover:not(:disabled) {
+  border-color: #8ba6c5;
+  background: #29384a;
+}
+
+.instruction-field-chip:active:not(:disabled) {
+  cursor: grabbing;
+}
+
+.instruction-field-chip.is-selected {
+  border-color: #b5d2f2;
+  background: #33475f;
+  color: #f1f7ff;
+  box-shadow: 0 0 0 2px #a9c8ed40;
+}
+
+.instruction-field-strip-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid #3a4859;
+  border-radius: 9px;
+  background: #121821;
+  scrollbar-width: thin;
+  scrollbar-color: #52647b #171e27;
+}
+
+.instruction-bit-strip {
+  display: grid;
+  grid-template-columns: repeat(32, minmax(36px, 1fr));
+  width: 100%;
+  min-width: 1152px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #141b25;
+}
+
+.instruction-bit-slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 82px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 3px;
+  border: 0;
+  border-right: 1px solid #3d4a5b;
+  border-radius: 0;
+  background: #202a37;
+  color: #d8e4f2;
+  text-align: center;
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.instruction-bit-slot:hover:not(:disabled) {
+  background: #2b394b;
+}
+
+.instruction-bit-slot:focus-visible {
+  z-index: 2;
+  outline-offset: -3px;
+}
+
+.instruction-bit-slot.is-drop-target {
+  z-index: 1;
+  outline: 3px solid #c5dcf8;
+  outline-offset: -3px;
+  background: #3a506b;
+  box-shadow: inset 0 0 0 2px #d5e6fa55;
+}
+
+.instruction-bit-slot.is-filled {
+  touch-action: none;
+}
+
+.instruction-bit-slot.is-moving {
+  background: #35475d;
+  box-shadow: inset 0 0 0 2px #b4d1f0;
+}
+
+.instruction-bit-slot.is-correct {
+  background: #24392f;
+  color: #c9e8d4;
+}
+
+.instruction-bit-slot.is-incorrect {
+  background: #3b2929;
+  color: #f0c1bc;
+}
+
+.instruction-bit-slot.has-hint {
+  border-bottom: 2px solid #c3a976;
+}
+
+.instruction-bit-range {
+  color: #a4b3c6;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.instruction-bit-slot > strong {
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.instruction-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 8px 11px;
+  border: 1px solid #b7d1ee;
+  border-radius: 7px;
+  background: #2f4158ed;
+  box-shadow: 0 8px 25px #0008;
+  color: #f2f7fd;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.instruction-placement-status {
+  min-height: 0;
+}
+
+.instruction-how-fields {
+  margin-top: 8px;
+  border-top: 1px solid #303c4a;
+  color: #b7c5d7;
+  font-size: 14px;
+}
+
+.instruction-how-fields summary {
+  width: fit-content;
+  min-height: 42px;
+  padding: 10px 2px;
+  color: #bdd0e8;
+  cursor: pointer;
+}
+
+.instruction-how-fields p {
+  max-width: 760px;
+  padding: 0 0 12px 2px;
+  color: #aab8ca;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.instruction-round-status {
+  margin: 10px 0 0;
+  color: #d3b97e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.instruction-stage-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 240px);
+  align-items: center;
+  gap: 18px;
+  margin: 7px 0 13px;
+}
+
+.instruction-stage-head > div:first-child > span {
+  color: #9eafc4;
+  font-size: 14px;
+}
+
+.instruction-stage-head h3 {
+  margin-top: 2px;
+  color: #e2ebf6;
+  font-size: 16px;
+  font-weight: 560;
+}
+
+.instruction-stage-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #303b49;
+}
+
+.instruction-stage-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8eb4df;
+
+}
+
+.instruction-prompt {
+  margin: 12px 0;
+  color: #becada;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.instruction-encoded-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.instruction-encoded-fields > div {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #354253;
+  border-radius: 7px;
+  background: #151b23;
+}
+
+.instruction-encoded-fields > div > span {
+  color: #9eafc4;
+  font-size: 14px;
+}
+
+.instruction-encoded-fields > div > strong {
+  overflow-wrap: anywhere;
+  color: #dbe6f4;
+  font-size: 14px;
+}
+
+.instruction-lab .trainer-field-label {
+  font-size: 14px;
+}
+
+.instruction-lab input,
+.instruction-lab select {
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.instruction-lab .trainer-instruction-sample {
+  font-size: 14px;
+}
+
+.instruction-lab .trainer-field-values span,
+.instruction-lab .trainer-field-values strong {
+  font-size: 14px;
+}
+
+@media (max-width: 680px) {
+  .instruction-stage-head {
+    grid-template-columns: minmax(0, 1fr) minmax(78px, 120px);
+    gap: 10px;
+  }
+
+  .instruction-field-bank {
+    padding: 10px;
+  }
+
+  .instruction-field-chip {
+    min-height: 44px;
+  }
+
+  .instruction-bit-strip {
+    min-width: 1152px;
+  }
+
+  .instruction-bit-slot {
+    min-height: 88px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .instruction-stage-progress > span {
+    transition: none;
+  }
+}
+
+.instruction-b-strip{grid-template-columns:repeat(32,minmax(44px,1fr));min-width:1408px}
+
+.instruction-pan-note{margin:10px 0;color:#b7c5d7;font-size:14px;line-height:1.5}

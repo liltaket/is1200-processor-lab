@@ -18,6 +18,27 @@ function responseFor(answer: string, id: string): string {
   return answer.match(/^-?\d+/)?.[0] ?? answer;
 }
 
+async function placeField(page: import('@playwright/test').Page, format: string, range: string, field: string) {
+  const bank = page.getByRole('group', { name: 'Available instruction fields' });
+  await bank.getByRole('button', { name: field, exact: true }).click();
+  const strip = page.getByRole('group', { name: `${format}-type instruction bit fields` });
+  await strip.locator(`[data-slot-range="${range}"]`).click();
+}
+
+async function dragField(page: import('@playwright/test').Page, format: string, field: string, range: string) {
+  const chip = page.getByRole('group', { name: 'Available instruction fields' }).getByRole('button', { name: field, exact: true });
+  const slot = page.getByRole('group', { name: `${format}-type instruction bit fields` }).locator(`[data-slot-range="${range}"]`);
+  await chip.scrollIntoViewIfNeeded();
+  await slot.scrollIntoViewIfNeeded();
+  const from = await chip.boundingBox();
+  const to = await slot.boundingBox();
+  if (!from || !to) throw new Error('Field chip or target range is not visible.');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+}
+
 test('manual beq keeps the branch target pending until the rising edge', async ({ page }) => {
   await page.goto('./#/datapath');
   const exercise = page.getByRole('region', { name: 'Manual trace exercise' });
@@ -32,7 +53,7 @@ test('manual beq keeps the branch target pending until the rising edge', async (
       await exercise.getByRole('textbox', { name: 'Your prediction' }).fill(response);
     }
     await exercise.getByRole('button', { name: 'Check prediction' }).click();
-    await expect(exercise.getByText('Correct — follow that path.')).toBeVisible();
+    await expect(exercise.locator('.feedback.correct strong')).toHaveText('Correct');
     await exercise.getByRole('button', { name: 'Continue' }).click();
   }
 
@@ -40,11 +61,15 @@ test('manual beq keeps the branch target pending until the rising edge', async (
   await expect(exercise.getByText('pending', { exact: true })).toBeVisible();
   await expect(exercise.locator('.pending-pc')).toContainText('12');
   await expect(exercise.locator('.pending-pc')).toContainText('4');
-  await expect(page.getByText('Combinational evaluation · stored state has not changed.')).toBeVisible();
+  await expect(page.locator('.state-boundary')).toContainText('Before rising edge');
   await exercise.getByRole('button', { name: 'Tick rising edge' }).click();
-  await expect(page.getByText('Rising edge committed. PC and register state updated together.')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Completed trace · before the edge' })).toBeVisible();
+  await expect(page.locator('.state-boundary')).toContainText('Rising edge applied');
+  await expect(page.getByRole('heading', { name: 'One cycle, completed.' })).toBeVisible();
   await expect(page.locator('.context-pc')).toContainText('PC before edge');
+  await expect(page.locator('.state-boundary')).toContainText('Rising edge applied');
+  await expect(page.locator('details.signal-details')).not.toHaveAttribute('open', '');
+  await page.locator('details.signal-details summary').click();
+  await expect(page.locator('.signal-table')).toContainText('branch');
   await expect(exercise.getByText('committed', { exact: true })).toBeVisible();
   await expect(page.locator('.register-cell').filter({ hasText: 't0' })).toContainText('4');
   await expect(page.locator('.register-cell').filter({ hasText: 't1' })).toContainText('4');
@@ -62,30 +87,40 @@ test('clock timing choices freeze after grading', async ({ page }) => {
 
 test('oral guide can be revealed and self-graded once', async ({ page }) => {
   await page.goto('./#/oral');
-  await page.getByLabel('Your notes').fill('PCnext is calculated combinationally and captured by PC at the rising edge.');
+  await page.getByLabel('Your answer').fill('PCnext is calculated combinationally and captured by PC at the rising edge.');
   await page.getByRole('button', { name: 'Reveal answer guide' }).click();
-  await expect(page.getByText('Expected concepts')).toBeVisible();
-  await expect(page.getByText(/Source:/)).toBeVisible();
+  await expect(page.getByText('Expected concepts and model answer')).toBeVisible();
+  await expect(page.locator('details.study-source-details')).not.toHaveAttribute('open', '');
+  await page.locator('details.study-source-details summary').click();
+  await expect(page.locator('details.study-source-details')).toContainText('Source');
   await page.getByRole('button', { name: 'Understood' }).click();
-  await expect(page.getByText('Progress recorded')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Understood' })).toBeDisabled();
+  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('Oral exam');
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
 });
 
 test('factorial examples 0, 3, and 8 run to a self-loop with the expected result', async ({ page }) => {
   await page.goto('./#/factorial');
-  const input = page.getByLabel('Demonstration input n');
+  const input = page.getByLabel('Example input n');
   for (const [n, expected] of [[0, 1], [3, 6], [8, 40320]]) {
     await input.selectOption(String(n));
-    await page.getByRole('button', { name: 'Run to stop loop' }).click();
+    await page.getByRole('button', { name: 'Run to stop' }).click();
     await expect(page.getByText(new RegExp(`Stop loop reached.*t2 = ${expected}\\.`))).toBeVisible();
     await expect(page.locator('.study-cpu-readouts')).toContainText(String(expected));
-    if (n !== 8) await page.getByRole('button', { name: 'Reset processor' }).click();
+    const lastEdge = page.locator('details.study-edge-details');
+    await expect(lastEdge).not.toHaveAttribute('open', '');
+    await lastEdge.locator('summary').click();
+    await expect(lastEdge.locator('.study-last-trace')).toContainText('Last instruction');
+    if (n !== 8) await page.getByRole('button', { name: 'Reset' }).click();
   }
 });
 
 test('factorial rejects invalid edited source without advancing CPU state', async ({ page }) => {
   await page.goto('./#/factorial');
-  const source = page.getByLabel(/Lab 4 assembly/);
+  await expect(page.locator('details.study-disclosure').filter({ hasText: 'Edit program' })).not.toHaveAttribute('open', '');
+  await page.getByText('Edit program', { exact: true }).click();
+  const source = page.getByLabel('Assembly source');
   await source.fill('addi t2, x0\n');
   await page.getByRole('button', { name: 'Assemble edits' }).click();
   await expect(page.getByText(/expects 3 operands/)).toBeVisible();
@@ -95,6 +130,7 @@ test('factorial rejects invalid edited source without advancing CPU state', asyn
 
 test('hex import validates the words and runs to its self-branching stop loop', async ({ page }) => {
   await page.goto('./#/factorial');
+  await page.getByText('Edit program', { exact: true }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: 'known.hex',
     mimeType: 'text/plain',
@@ -103,35 +139,64 @@ test('hex import validates the words and runs to its self-branching stop loop', 
   await expect(page.getByText('known.hex loaded and validated in Lab 4 mode.')).toBeVisible();
   await expect(page.locator('#factorial-source')).toContainText('addi t0, zero, 3');
   await expect(page.locator('#factorial-source')).toContainText('addi t2, zero, 9');
-  await page.getByRole('button', { name: 'Run to stop loop' }).click();
+  await page.getByRole('button', { name: 'Run to stop' }).click();
   await expect(page.getByText(/Stop loop reached after 3 total clock cycles\. t2 = 9\./)).toBeVisible();
   await expect(page.locator('.study-cpu-readouts')).toContainText('9');
 });
 
 test('assisted factorial prediction is not counted as a correct attempt', async ({ page }) => {
   await page.goto('./#/factorial');
-  await page.getByRole('button', { name: 'Show expected value' }).click();
-  await page.getByRole('button', { name: 'Check prediction' }).click();
-  await expect(page.getByText(/assisted or repeated check was not counted/)).toBeVisible();
-  await expect(page.locator('.session-summary')).toContainText('0 attempts');
+  await expect(page.locator('details.study-prediction-panel')).not.toHaveAttribute('open', '');
+  await page.getByText('Predict future state', { exact: true }).click();
+  await page.getByRole('button', { name: 'Show value' }).click();
+  await page.getByRole('button', { name: 'Check', exact: true }).click();
+  await expect(page.locator('.study-status')).toContainText('assisted or repeated check was not counted');
+  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure').getByText('Factorial', { exact: true })).toBeVisible();
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('Not practiced');
 });
 
-test('hash navigation selects the matching topic and unknown topics fall back safely', async ({ page }) => {
+test('welcome opens the lab and deep topic hashes survive refresh', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByRole('heading', { name: 'Welcome to the lab.' })).toBeVisible();
+  await page.getByRole('link', { name: 'Open lab' }).click();
+  await expect(page.locator('.breadcrumb')).toContainText('Datapath');
+  expect(await page.evaluate(() => location.hash)).toBe('#/datapath');
+  await page.goto('./#/branch');
+  await page.reload();
+  await expect(page.locator('.breadcrumb')).toContainText('Branches');
+});
+
+test('hash navigation selects the matching topic and unknown routes return to welcome', async ({ page }) => {
   await page.goto('./#/datapath');
-  await page.locator('.sidebar nav').getByRole('link', { name: 'Branch' }).click();
+  await page.locator('.desktop-topics').getByRole('link', { name: 'Branches' }).click();
   await expect(page.locator('.breadcrumb')).toContainText('Branch');
   await page.goto('./#/not-a-topic');
-  await expect(page.locator('.breadcrumb')).toContainText('Datapath');
+  await expect(page.getByRole('heading', { name: 'Welcome to the lab.' })).toBeVisible();
+});
+
+test('mobile topic menu opens a topic and closes after navigation', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('./#/datapath');
+  const menu = page.locator('details.topic-menu');
+  await expect(menu).not.toHaveAttribute('open', '');
+  await menu.getByText('Topics', { exact: true }).click();
+  await menu.getByRole('navigation', { name: 'Mobile learning topics' }).getByRole('link', { name: 'Branches' }).click();
+  await expect(page.locator('.breadcrumb')).toContainText('Branches');
+  await expect(menu).not.toHaveAttribute('open', '');
+  expect(await page.evaluate(() => location.hash)).toBe('#/branch');
 });
 
 test('recorded progress persists after reload', async ({ page }) => {
   await page.goto('./#/clock');
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).not.toHaveAttribute('open', '');
   await page.getByRole('button', { name: 'Immediate propagation' }).click();
   await page.getByRole('button', { name: 'Check timing' }).click();
-  await expect(page.locator('.session-summary')).toContainText('1 attempt');
-  await expect(page.getByText('Progress saved on this device')).toBeVisible();
+  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
   await page.reload();
-  await expect(page.locator('.session-summary')).toContainText('1 attempt');
+  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
+  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
 });
 
 test('application stays usable when local storage is blocked', async ({ page }) => {
@@ -139,8 +204,8 @@ test('application stays usable when local storage is blocked', async ({ page }) 
     Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked'); } });
   });
   await page.goto('./#/datapath');
-  await expect(page.getByRole('heading', { name: 'Be the processor.' })).toBeVisible();
-  await expect(page.getByText('Storage unavailable · session only')).toBeVisible();
+  await expect(page.locator('.breadcrumb')).toContainText('Datapath');
+  await expect(page.getByRole('status')).toContainText('Progress cannot be saved on this device');
 });
 
 test('keyboard skip link focuses main without changing the topic hash', async ({ page }) => {
@@ -164,6 +229,7 @@ test('SVG datapath component can be opened with Enter', async ({ page }) => {
 
 test('register reads change immediately and writes to x0 remain ignored', async ({ page }) => {
   await page.goto('./#/registers');
+  await expect(page.locator('details.trainer-extra').filter({ hasText: 'Practice a write' })).not.toHaveAttribute('open', '');
   await expect(page.locator('.trainer-read-ports')).toContainText('42');
   await page.getByLabel('A1 · read address 1').selectOption('6');
   await expect(page.locator('.trainer-read-ports')).toContainText('-19');
@@ -186,6 +252,7 @@ test('ALU grades a signed overflow result as a wrapped 32-bit value', async ({ p
 
 test('control exercise distinguishes encoded fields from four generated signals', async ({ page }) => {
   await page.goto('./#/control');
+  await expect(page.locator('details.trainer-extra').filter({ hasText: 'How the decoder works' })).not.toHaveAttribute('open', '');
   const mnemonic = (await page.locator('.trainer-sample-mnemonic').textContent())?.trim();
   const values = mnemonic === 'beq'
     ? { opcode: '0x00000063', regWrite: '0', aluSrc: '0', branch: '1', aluControl: '001' }
@@ -195,6 +262,8 @@ test('control exercise distinguishes encoded fields from four generated signals'
   for (const [label, value] of Object.entries(values)) await page.getByLabel(label === 'opcode' ? 'Encoded opcode' : label === 'aluControl' ? 'ALUControl' : label === 'regWrite' ? 'RegWrite' : label === 'aluSrc' ? 'ALUSrc' : 'Branch').selectOption(value);
   await page.getByRole('button', { name: 'Check controls' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
+  await expect(page.locator('details.trainer-extra').filter({ hasText: 'How the decoder works' })).not.toHaveAttribute('open', '');
+  await page.getByText('How the decoder works', { exact: true }).click();
   for (const name of ['RegWrite', 'ALUSrc', 'Branch', 'ALUControl']) {
     await expect(page.locator('.trainer-signal-table')).toContainText(name);
   }
@@ -203,19 +272,15 @@ test('control exercise distinguishes encoded fields from four generated signals'
 test('format field placement grades the complete R-type bit layout', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
-  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   await expect(page.locator('.trainer-instruction-sample code')).toContainText('add ');
   const slots = [
     ['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'],
     ['14:12', 'funct3'], ['11:7', 'rd'], ['6:0', 'opcode'],
   ];
   const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
-  await expect(strip.getByRole('button').first()).toHaveAccessibleName('Bits 31:25; no field assigned');
-  for (const [index, [range, field]] of slots.entries()) {
-    await strip.getByRole('button').nth(index).click();
-    await page.getByLabel(`Place a field in bits ${range}`).selectOption(field);
-  }
-  await page.getByRole('button', { name: 'Check field positions' }).click();
+  await expect(strip.locator('[data-slot-range="31:25"]')).toHaveAccessibleName('Bits 31:25; empty range');
+  for (const [range, field] of slots) await placeField(page, 'R', range, field);
+  await page.getByRole('button', { name: 'Check layout' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Decoded operands' })).toBeVisible();
 });
@@ -223,26 +288,83 @@ test('format field placement grades the complete R-type bit layout', async ({ pa
 test('completed but incorrect field placement can be checked and graded', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
-  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const slots = [
     ['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'],
     ['14:12', 'funct3'], ['11:7', 'rd'], ['6:0', 'opcode'],
   ];
-  const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
-  for (const [index, [range]] of slots.entries()) {
-    await strip.getByRole('button').nth(index).click();
-    await page.getByLabel(`Place a field in bits ${range}`).selectOption(slots[(index + 1) % slots.length][1]);
-  }
-  const check = page.getByRole('button', { name: 'Check field positions' });
+  for (const [index, [range]] of slots.entries()) await placeField(page, 'R', range, slots[(index + 1) % slots.length][1]);
+  const check = page.getByRole('button', { name: 'Check layout' });
   await expect(check).toBeEnabled();
   await check.click();
   await expect(page.getByRole('status').filter({ hasText: 'Not quite' })).toBeVisible();
 });
 
+test('field bank supports tap, keyboard placement, and moving a unique field', async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto('./#/formats');
+  const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
+  const bank = page.getByRole('group', { name: 'Available instruction fields' });
+  const funct7 = bank.getByRole('button', { name: 'funct7', exact: true });
+  await funct7.click();
+  await expect(funct7).toHaveAttribute('aria-pressed', 'true');
+  await strip.locator('[data-slot-range="31:25"]').click();
+  await expect(strip.locator('[data-slot-range="31:25"]')).toHaveAccessibleName('Bits 31:25; assigned funct7');
+
+  const rs2 = bank.getByRole('button', { name: 'rs2', exact: true });
+  await rs2.focus();
+  await page.keyboard.press('Enter');
+  await strip.locator('[data-slot-range="31:25"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(strip.locator('[data-slot-range="31:25"]')).toHaveAccessibleName('Bits 31:25; assigned rs2');
+  await expect(bank.getByRole('button', { name: 'funct7', exact: true })).toBeVisible();
+  await expect(strip.locator('[data-slot-range="24:20"]')).toHaveAccessibleName('Bits 24:20; empty range');
+  await expect(page.getByRole('status')).toContainText('funct7 returned to the field bank');
+});
+
+test('mouse pointer can drag an instruction field onto its range', async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto('./#/formats');
+  const chip = page.getByRole('group', { name: 'Available instruction fields' }).getByRole('button', { name: 'funct7', exact: true });
+  await chip.click();
+  await expect(chip).toHaveAttribute('aria-pressed', 'true');
+  await dragField(page, 'R', 'funct7', '31:25');
+  await expect(page.getByRole('group', { name: 'R-type instruction bit fields' }).locator('[data-slot-range="31:25"]'))
+    .toHaveAccessibleName('Bits 31:25; assigned funct7');
+});
+
+test('touch pointer can drag an instruction field on a narrow screen', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 1000 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto('./#/formats');
+  await expect(page.getByText('Scroll sideways for all bit ranges.', { exact: true })).toBeVisible();
+  const chip = page.getByRole('group', { name: 'Available instruction fields' }).getByRole('button', { name: 'funct7', exact: true });
+  const slot = page.getByRole('group', { name: 'R-type instruction bit fields' }).locator('[data-slot-range="31:25"]');
+  await chip.scrollIntoViewIfNeeded();
+  await slot.scrollIntoViewIfNeeded();
+  const from = await chip.boundingBox();
+  const to = await slot.boundingBox();
+  if (!from || !to) throw new Error('Field chip or target range is not visible.');
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x + from.width / 2, y: from.y + from.height / 2, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: to.x + to.width / 2, y: to.y + to.height / 2, id: 1 }] });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(slot).toHaveAccessibleName('Bits 31:25; assigned funct7');
+  await context.close();
+});
+
+test('guided instruction fields reveal the mapping without scoring practice', async ({ page }) => {
+  await page.addInitScript(() => { Math.random = () => 0; });
+  await page.goto('./#/formats');
+  await page.getByRole('button', { name: 'Guided lesson' }).click();
+  const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
+  await expect(strip.locator('[data-slot-range="31:25"]')).toHaveAccessibleName('Bits 31:25; field funct7');
+  await expect(page.getByText('Guided · unscored')).toBeVisible();
+});
+
 test('B-format assembly and scattered immediate bits are visible', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.99; });
   await page.goto('./#/formats');
-  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('beq', () => 0.99);
   expect(scenario.instruction.name).toBe('beq');
   await expect(page.locator('.trainer-instruction-sample code')).toContainText('beq ');
@@ -252,12 +374,8 @@ test('B-format assembly and scattered immediate bits are visible', async ({ page
     ['19:15', 'rs1'], ['14:12', 'funct3'], ['11:8', 'imm[4:1]'],
     ['7', 'imm[11]'], ['6:0', 'opcode'],
   ];
-  const strip = page.getByRole('group', { name: 'B-type instruction bit fields' });
-  for (const [index, [range, field]] of slots.entries()) {
-    await strip.getByRole('button').nth(index).click();
-    await page.getByLabel(`Place a field in bits ${range}`).selectOption(field);
-  }
-  await page.getByRole('button', { name: 'Check field positions' }).click();
+  for (const [range, field] of slots) await placeField(page, 'B', range, field);
+  await page.getByRole('button', { name: 'Check layout' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
 
   const fragments = [
@@ -275,33 +393,28 @@ test('B-format assembly and scattered immediate bits are visible', async ({ page
 test('encoding exercise grades all five stages through the shared encoder', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/encoding');
-  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('add', () => 0);
   await page.getByLabel('Instruction format family').selectOption('R');
-  await page.getByRole('button', { name: 'Check format' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continue to Opcode' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
 
   await page.getByLabel('Encoded opcode field').selectOption('0x00000033');
-  await page.getByRole('button', { name: 'Check opcode' }).click();
-  await page.getByRole('button', { name: 'Continue to Operands' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
 
   for (const [index, value] of [scenario.instruction.rd!, scenario.instruction.rs1, scenario.instruction.rs2!].entries()) {
     await page.locator('.trainer-operand-grid select').nth(index).selectOption(String(value));
   }
-  await page.getByRole('button', { name: 'Check operands' }).click();
-  await page.getByRole('button', { name: 'Continue to Field placement' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
 
-  const encodingStrip = page.getByRole('group', { name: 'R-type instruction bit fields' });
-  for (const [index, [range, field]] of [['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'], ['14:12', 'funct3'], ['11:7', 'rd'], ['6:0', 'opcode']].entries()) {
-    await encodingStrip.getByRole('button').nth(index).click();
-    await page.getByLabel(`Place a field in bits ${range}`).selectOption(field);
-  }
-  await page.getByRole('button', { name: 'Check field placement' }).click();
-  await page.getByRole('button', { name: 'Continue to 32-bit word' }).click();
+  for (const [range, field] of [['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'], ['14:12', 'funct3'], ['11:7', 'rd'], ['6:0', 'opcode']]) await placeField(page, 'R', range, field);
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
 
   await page.getByLabel('Complete 32-bit instruction · hexadecimal').fill(`0x${scenario.word.toString(16).padStart(8, '0')}`);
-  await page.getByRole('button', { name: 'Check 32-bit word' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await expect(page.locator('.trainer-final-word')).toContainText(`0x${scenario.word.toString(16).padStart(8, '0')}`);
 });
@@ -309,29 +422,24 @@ test('encoding exercise grades all five stages through the shared encoder', asyn
 test('encoding field placement can submit a complete incorrect arrangement', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/encoding');
-  await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('add', () => 0);
   await page.getByLabel('Instruction format family').selectOption('R');
-  await page.getByRole('button', { name: 'Check format' }).click();
-  await page.getByRole('button', { name: 'Continue to Opcode' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
   await page.getByLabel('Encoded opcode field').selectOption('0x00000033');
-  await page.getByRole('button', { name: 'Check opcode' }).click();
-  await page.getByRole('button', { name: 'Continue to Operands' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
   for (const [index, value] of [scenario.instruction.rd!, scenario.instruction.rs1, scenario.instruction.rs2!].entries()) {
     await page.locator('.trainer-operand-grid select').nth(index).selectOption(String(value));
   }
-  await page.getByRole('button', { name: 'Check operands' }).click();
-  await page.getByRole('button', { name: 'Continue to Field placement' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
 
   const fields = ['funct7', 'rs2', 'rs1', 'funct3', 'rd', 'opcode'];
   const ranges = ['31:25', '24:20', '19:15', '14:12', '11:7', '6:0'];
-  const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
-  const check = page.getByRole('button', { name: 'Check field placement' });
+  const check = page.getByRole('button', { name: 'Check answer' });
   await expect(check).toBeDisabled();
-  for (const [index, range] of ranges.entries()) {
-    await strip.getByRole('button').nth(index).click();
-    await page.getByLabel(`Place a field in bits ${range}`).selectOption(fields[(index + 1) % fields.length]);
-  }
+  for (const [index, range] of ranges.entries()) await placeField(page, 'R', range, fields[(index + 1) % fields.length]);
   await expect(check).toBeEnabled();
   await check.click();
   await expect(page.getByRole('status').filter({ hasText: 'Not quite' })).toBeVisible();
@@ -340,6 +448,7 @@ test('encoding field placement can submit a complete incorrect arrangement', asy
 test('branch prediction checks control, comparison, byte target, and selected next PC', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.5; });
   await page.goto('./#/branch');
+  await expect(page.locator('details.trainer-extra').filter({ hasText: 'Follow the branch path' })).not.toHaveAttribute('open', '');
   const scenario = generateScenario('beq', () => 0.5);
   const trace = traceCycle(scenario.state, scenario.word);
   await page.getByLabel('SUB result · ALU Y').fill(String(toSigned(trace.aluResult)));
@@ -351,16 +460,19 @@ test('branch prediction checks control, comparison, byte target, and selected ne
   await page.getByLabel('PCnext · byte address').fill(String(trace.pcNext));
   await page.getByRole('button', { name: 'Check branch' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
+  await page.getByText('Follow the branch path', { exact: true }).click();
   await expect(page.locator('.trainer-branch-path')).toContainText(`PCnext = ${trace.pcNext}`);
 });
 
 test('ROM exercise converts a nonzero byte PC to its word index', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.5; });
   await page.goto('./#/rom');
+  await expect(page.locator('details.trainer-extra').filter({ hasText: 'Why divide by four?' })).not.toHaveAttribute('open', '');
   const scenario = generateScenario('add', () => 0.5);
   const trace = traceCycle(scenario.state, scenario.word);
   expect(trace.pc).toBeGreaterThan(0);
   expect(trace.romAddress).toBe(trace.pc / 4);
+  await page.getByText('Why divide by four?', { exact: true }).click();
   await expect(page.locator('.trainer-rom-fetch')).toContainText(`0x${trace.pc.toString(16).padStart(2, '0').toUpperCase()}`);
   await page.getByLabel('Which ROM word index does this PC select?').fill(String(trace.romAddress));
   await page.getByRole('button', { name: 'Check ROM address' }).click();

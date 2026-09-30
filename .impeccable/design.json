@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T19:04:36Z",
+  "generatedAt": "2026-09-30T21:00:27Z",
   "title": "Design System: IS1200 Processor Lab",
   "extensions": {
     "colorMeta": {
@@ -14,109 +14,135 @@
       "control-amber": { "role": "secondary", "displayName": "Control Amber", "canonical": "#e5bb79", "tonalRamp": ["#19130b", "#302516", "#4d3a20", "#73552d", "#9b713e", "#c39455", "#e5bb79", "#f5e1bd"] },
       "state-lilac": { "role": "tertiary", "displayName": "State Lilac", "canonical": "#c7b5eb", "tonalRamp": ["#15121b", "#282333", "#403752", "#5d4f76", "#7c6b9b", "#a08bc2", "#c7b5eb", "#eee7fb"] },
       "success-green": { "role": "secondary", "displayName": "Success Green", "canonical": "#a5d4b7", "tonalRamp": ["#0e1711", "#1c2d22", "#2d4937", "#42684e", "#5d896b", "#7eb28f", "#a5d4b7", "#e0f3e7"] },
-      "error-red": { "role": "secondary", "displayName": "Error Red", "canonical": "#f3aaa5", "tonalRamp": ["#1a1010", "#321e1d", "#50302e", "#754642", "#a2605a", "#ca827b", "#f3aaa5", "#fbe4e2"] }
+      "error-red": { "role": "secondary", "displayName": "Error Red", "canonical": "#f3aaa5", "tonalRamp": ["#1a1010", "#321e1d", "#50302e", "#754642", "#a2605a", "#ca827b", "#f3aaa5", "#fbe4e2"] },
+      "action-blue": { "role": "primary", "displayName": "Action Blue", "canonical": "#a9c5e6", "tonalRamp": ["#11151b", "#202a37", "#35465f", "#526d90", "#7594b9", "#a9c5e6", "#c4d7ee", "#e8f1fc"] }
     },
     "typographyMeta": {
-      "display": { "displayName": "System Display", "purpose": "Page headings in the workbench." },
-      "body": { "displayName": "System Sans", "purpose": "Instructional prose and interface labels." },
-      "label": { "displayName": "Compact Label", "purpose": "Field labels, phase markers, and compact metadata." },
-      "mono": { "displayName": "Machine Mono", "purpose": "Instruction text, addresses, encoded values, and code." }
+      "display": { "displayName": "Workbench Heading", "purpose": "The active topic heading." },
+      "welcome-display": { "displayName": "Welcome Display", "purpose": "The single welcome headline." },
+      "body": { "displayName": "System Sans", "purpose": "Instructional prose and readable interface text." },
+      "label": { "displayName": "Workbench Label", "purpose": "Topic, field, phase, and action labels." },
+      "mono": { "displayName": "Machine Mono", "purpose": "Instruction words, addresses, encoded values, and code." }
     },
-    "shadows": [],
+    "shadows": [
+      { "name": "mobile-topic-popover", "value": "0 12px 34px #05070b80", "purpose": "Separates the expanded mobile Topics menu from the work area." }
+    ],
     "motion": [
-      { "name": "state-transition", "value": "0.15s", "purpose": "Brief color and surface changes on buttons, navigation, and diagram nodes." },
-      { "name": "progress-transition", "value": "0.2s", "purpose": "Short progress indicator updates." },
-      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Disable transitions and animations when requested by the user." }
+      { "name": "state-transition", "value": "0.15s", "purpose": "Brief color and surface changes on controls, navigation, and diagram nodes." },
+      { "name": "reduced-motion", "value": "prefers-reduced-motion: reduce", "purpose": "Disable transitions and animations when requested." }
     ],
     "breakpoints": [
-      { "name": "wide", "value": "1700px" },
-      { "name": "manual-stack", "value": "1060px" },
-      { "name": "tablet-nav", "value": "760px" },
-      { "name": "small-screen", "value": "420px" },
-      { "name": "study-stack", "value": "850px" },
-      { "name": "trainer-stack", "value": "680px" }
+      { "name": "wide-workbench", "value": "1650px" },
+      { "name": "manual-single-column", "value": "1100px" },
+      { "name": "mobile-topics", "value": "800px" },
+      { "name": "welcome-compact", "value": "560px" },
+      { "name": "narrow-content", "value": "480px" }
     ]
   },
   "components": [
     {
-      "name": "Primary Button",
+      "name": "Welcome Action",
+      "kind": "button",
+      "refersTo": "welcome-action",
+      "description": "The clear starting action from the welcome screen into datapath practice.",
+      "html": "<a class=\"ds-welcome-action\" href=\"#/datapath\">Open lab <span aria-hidden=\"true\">→</span></a>",
+      "css": ".ds-welcome-action { display: inline-flex; align-items: center; justify-content: space-between; gap: 30px; min-height: 54px; margin-top: 35px; padding: 15px 23px; border: 1px solid #a9c5e6; border-radius: 7px; background: #a9c5e6; color: #13253a; font: 600 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-decoration: none; } .ds-welcome-action:hover { border-color: #c4d7ee; background: #c4d7ee; } .ds-welcome-action:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+    },
+    {
+      "name": "Primary Practice Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The main confirm or advance action in a learning step.",
-      "html": "<button class=\"ds-button-primary\">Check answer</button>",
-      "css": ".ds-button-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 14px; border: 1px solid #a9c5e6; border-radius: 7px; background: #a9c5e6; color: #13253a; font: 550 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-button-primary:hover:not(:disabled) { background: #c4d7ee; border-color: #c4d7ee; } .ds-button-primary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+      "description": "Checks the learner's prediction or advances a completed step.",
+      "html": "<button class=\"ds-primary\">Check prediction</button>",
+      "css": ".ds-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 11px 16px; border: 1px solid #a9c5e6; border-radius: 7px; background: #a9c5e6; color: #13253a; font: 550 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-primary:hover:not(:disabled) { background: #c4d7ee; border-color: #c4d7ee; } .ds-primary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; } .ds-primary:disabled { opacity: .48; cursor: default; }"
     },
     {
-      "name": "Secondary Button",
+      "name": "Secondary Practice Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "A supporting action that should remain visually quieter than the main action.",
-      "html": "<button class=\"ds-button-secondary\">Show explanation</button>",
-      "css": ".ds-button-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 9px 14px; border: 1px solid #465365; border-radius: 7px; background: transparent; color: #c8d3e3; font: 550 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-button-secondary:hover:not(:disabled) { background: #354357; } .ds-button-secondary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+      "description": "A supporting or explicit reveal action beside the main practice action.",
+      "html": "<button class=\"ds-secondary\">Show answer</button>",
+      "css": ".ds-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 11px 16px; border: 1px solid #465365; border-radius: 7px; background: transparent; color: #c8d3e3; font: 550 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; transition: background .15s; } .ds-secondary:hover:not(:disabled) { background: #354357; } .ds-secondary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; } .ds-secondary:disabled { opacity: .48; cursor: default; }"
     },
     {
-      "name": "Text Input",
+      "name": "Practice Input",
       "kind": "input",
       "refersTo": "input",
-      "description": "A compact dark field for numeric values and short answers.",
-      "html": "<label class=\"ds-field\"><span>Immediate value</span><input placeholder=\"-4\"></label>",
-      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; color: #c1cdde; font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input { min-width: 0; min-height: 40px; padding: 10px 12px; border: 1px solid #465365; border-radius: 7px; background: #11161e; color: #e5ecf7; font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input::placeholder { color: #9aa8bc; } .ds-field input:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 2px; }"
+      "description": "A readable numeric or short text prediction field.",
+      "html": "<label class=\"ds-field\"><span>Your prediction</span><input placeholder=\"Decimal, 0x… or 0b…\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; color: #c1cdde; font: 500 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input { min-width: 0; min-height: 44px; padding: 11px 13px; border: 1px solid #465365; border-radius: 7px; background: #11161e; color: #e5ecf7; font: 400 15px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-field input::placeholder { color: #9aa8bc; } .ds-field input:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
     },
     {
-      "name": "Topic Navigation Item",
+      "name": "Desktop Topic Link",
       "kind": "nav",
-      "refersTo": "navigation",
-      "description": "A topic link in the persistent course navigation.",
-      "html": "<a class=\"ds-nav-item\" href=\"#datapath\">Datapath</a>",
-      "css": ".ds-nav-item { display: flex; align-items: center; gap: 10px; min-height: 39px; padding: 9px 11px; border-radius: 7px; color: #aeb8c7; font: 400 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-decoration: none; transition: background .15s, color .15s; } .ds-nav-item:hover { background: #212833; color: #fff; } .ds-nav-item[aria-current='page'] { background: #283547; color: #e0ebfb; } .ds-nav-item:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
+      "refersTo": "navigation-item",
+      "description": "A persistent topic choice in the desktop learning navigation.",
+      "html": "<a class=\"ds-topic-link\" href=\"#/datapath\" aria-current=\"page\">Datapath</a>",
+      "css": ".ds-topic-link { display: flex; align-items: center; gap: 11px; min-height: 44px; padding: 11px 12px; border-radius: 7px; color: #aeb8c7; font: 400 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-decoration: none; transition: background .15s, color .15s; } .ds-topic-link:hover { background: #212833; color: #fff; } .ds-topic-link[aria-current='page'] { background: #263447; color: #e8edf3; } .ds-topic-link:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; }"
     },
     {
       "name": "Learning Panel",
       "kind": "card",
       "refersTo": "panel",
-      "description": "A flat work surface for an exercise or processor subsystem.",
-      "html": "<section class=\"ds-panel\"><h2>Register file</h2><p>Two combinational reads, one clocked write.</p></section>",
-      "css": ".ds-panel { padding: 22px; border: 1px solid #2d3541; border-radius: 12px; background: #181d25; color: #e8edf3; } .ds-panel h2 { margin: 0 0 10px; color: #e8edf3; font: 550 15px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-panel p { margin: 0; color: #a4afbd; font: 400 13px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-panel:hover { border-color: #3c4858; } .ds-panel:focus-within { border-color: #526780; }"
+      "description": "A flat work surface for one exercise or processor subsystem.",
+      "html": "<section class=\"ds-panel\"><h2>Current register state</h2><p>State updates at the rising edge.</p></section>",
+      "css": ".ds-panel { padding: 22px; border: 1px solid #303946; border-radius: 12px; background: #181d25; color: #e8edf3; } .ds-panel h2 { margin: 0 0 12px; color: #e8edf3; font: 550 18px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-panel p { margin: 0; color: #a4afbd; font: 400 15px/1.65 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }"
     },
     {
-      "name": "Semantic Chip",
+      "name": "Mobile Topics Disclosure",
+      "kind": "custom",
+      "description": "A native expandable topic menu with progress and mixed review inside.",
+      "html": "<details class=\"ds-topics\"><summary>Topics <span aria-hidden=\"true\">⌄</span></summary><nav><a href=\"#/datapath\">Datapath</a><a href=\"#/formats\">Instruction formats</a></nav></details>",
+      "css": ".ds-topics { position: relative; color: #e8edf3; font: 400 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-topics > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 10px 12px; border: 1px solid #3b495d; border-radius: 7px; cursor: pointer; list-style: none; } .ds-topics > summary::-webkit-details-marker { display: none; } .ds-topics > summary:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 4px; } .ds-topics[open] { position: absolute; z-index: 30; top: 0; right: 0; width: min(320px, calc(100vw - 40px)); max-height: calc(100svh - 35px); overflow-y: auto; padding: 0 8px 10px; border: 1px solid #3b495d; border-radius: 9px; background: #181e28; box-shadow: 0 12px 34px #05070b80; } .ds-topics[open] > summary { border: 0; justify-content: flex-end; } .ds-topics nav { display: flex; flex-direction: column; gap: 3px; padding: 4px 0; } .ds-topics nav a { min-height: 44px; padding: 11px 12px; border-radius: 7px; color: #aeb8c7; text-decoration: none; } .ds-topics nav a:hover { background: #212833; color: #fff; }"
+    },
+    {
+      "name": "Instruction Field Chip",
       "kind": "chip",
-      "refersTo": "chip",
-      "description": "A compact label for a machine concept or state.",
-      "html": "<span class=\"ds-chip\">ALUControl</span>",
-      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 5px; background: #273140; color: #c4d4e9; font: 500 11px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-chip:hover { background: #344056; color: #dae7f8; } .ds-chip:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
+      "description": "A field label learners can drag or select before placing into a bit range.",
+      "html": "<button class=\"ds-field-chip\" aria-pressed=\"false\">funct3</button>",
+      "css": ".ds-field-chip { min-height: 44px; padding: 9px 12px; border: 1px solid #53647a; border-radius: 7px; background: #202a37; color: #d6e3f3; font: 550 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; } .ds-field-chip:hover:not(:disabled) { border-color: #8ba6c5; background: #29384a; } .ds-field-chip:active:not(:disabled) { cursor: grabbing; } .ds-field-chip[aria-pressed='true'] { border-color: #b5d2f2; background: #33475f; color: #f1f7ff; box-shadow: 0 0 0 2px #a9c8ed40; } .ds-field-chip:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
+    },
+    {
+      "name": "Scrollable Instruction Field Strip",
+      "kind": "custom",
+      "description": "An overflow-contained 32-bit layout; the scroll cue is shown when the strip is wider than its viewport.",
+      "html": "<div class=\"ds-field-layout\"><div class=\"ds-strip-scroll\" role=\"region\" aria-label=\"Scrollable 32-bit field layout\"><div class=\"ds-bit-strip ds-b-strip\"><button class=\"ds-bit-slot\">31 · ?</button><button class=\"ds-bit-slot ds-bit-six\">30:25 · ?</button><button class=\"ds-bit-slot\">24:20 · ?</button><button class=\"ds-bit-slot\">19:15 · ?</button></div></div><p class=\"ds-scroll-cue\">Scroll sideways for all bit ranges.</p></div>",
+      "css": ".ds-field-layout { min-width: 0; } .ds-strip-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid #3a4859; border-radius: 9px; background: #121821; scrollbar-width: thin; scrollbar-color: #52647b #171e27; } .ds-bit-strip { display: grid; grid-template-columns: repeat(32, minmax(36px, 1fr)); width: 100%; min-width: 1152px; overflow: hidden; border-radius: 8px; background: #141b25; } .ds-bit-strip.ds-b-strip { grid-template-columns: repeat(32, minmax(44px, 1fr)); min-width: 1408px; } .ds-bit-slot { display: flex; min-width: 0; min-height: 82px; align-items: center; justify-content: center; padding: 8px 3px; border: 0; border-right: 1px solid #3d4a5b; border-radius: 0; background: #202a37; color: #d8e4f2; font: 400 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: pan-x; user-select: none; -webkit-user-select: none; } .ds-bit-slot:hover:not(:disabled) { background: #2b394b; } .ds-bit-slot:focus-visible { z-index: 2; outline: 2px solid #a7c8ed; outline-offset: -3px; } .ds-scroll-cue { margin: 10px 0 0; color: #a4afbd; font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }"
     },
     {
       "name": "Datapath Signal Key",
       "kind": "custom",
-      "description": "The recurring visual key for editable data, control, and state paths.",
-      "html": "<div class=\"ds-signal-key\"><span><i class=\"ds-data-wire\"></i>Data</span><span><i class=\"ds-control-wire\"></i>Control</span><span><i class=\"ds-state-node\"></i>State</span></div>",
-      "css": ".ds-signal-key { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; color: #aeb9c9; font: 400 10px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-signal-key > span { display: inline-flex; align-items: center; gap: 5px; } .ds-data-wire { display: inline-block; width: 12px; height: 2px; background: #93b5d8; } .ds-control-wire { display: inline-block; width: 12px; height: 0; border-top: 1px dashed #d6b281; } .ds-state-node { display: inline-block; width: 8px; height: 8px; border: 1px solid #bda6da; border-radius: 2px; } .ds-signal-key > span:hover { color: #e8edf3; } .ds-signal-key:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
+      "description": "A recurring legend that maps signal color and line style to hardware role.",
+      "html": "<div class=\"ds-signal-key\"><span><i class=\"ds-data-wire\"></i>Data</span><span><i class=\"ds-control-wire\"></i>Control</span><span><i class=\"ds-state-node\"></i>Clocked state</span></div>",
+      "css": ".ds-signal-key { display: flex; align-items: center; flex-wrap: wrap; gap: 17px; color: #aeb9c9; font: 400 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; } .ds-signal-key > span { display: inline-flex; align-items: center; gap: 5px; } .ds-data-wire { display: inline-block; width: 12px; height: 2px; background: #93b5d8; } .ds-control-wire { display: inline-block; width: 12px; height: 0; border-top: 1px dashed #d6b281; } .ds-state-node { display: inline-block; width: 8px; height: 8px; border: 1px solid #bda6da; border-radius: 2px; }"
     }
   ],
   "narrative": {
     "northStar": "The Calm Processor Workbench",
-    "overview": "The interface feels like a focused technical instrument: dark slate surfaces recede behind the datapath, readable labels, and live values. Its visual hierarchy follows the work itself—read an instruction, follow its signals, then distinguish the clocked state change. The tone stays quiet so students can reason through the mechanism without decorative competition.\n\nColor carries meaning across the actual diagrams and learning modes. Blue marks data paths and the primary action; amber marks control; lilac marks sequential state. Responsive layouts keep navigation and guided work available on narrow screens, while the datapath remains a wide, pannable diagram when it cannot fit. Motion is brief and reduced when the user requests it.",
+    "overview": "The interface is a focused technical instrument. Dark slate surfaces leave room for the mechanism, its live values, and the learner's next decision. The welcome screen offers a single Open lab action beside a small vector circuit; once inside, one clear task leads each topic. Course identity stays quiet and supporting copy stays brief.\n\nColor carries processor meaning: blue identifies data and primary actions, amber identifies control, and lilac identifies clocked state. A larger, more readable type scale keeps the instructional interface legible; the responsive layout moves the question and required state ahead of the wide diagram on smaller screens. Practice waits for a prediction or an explicit reveal before exposing an answer. Field placement works with pointer drag, tap selection, or keyboard activation.",
     "keyCharacteristics": [
-      "Dark slate instrument surfaces with restrained borders.",
-      "Blue data, amber control, and lilac state cues.",
-      "Dense technical detail with readable hierarchy and horizontally pannable diagrams."
+      "Dark slate instrument surfaces, quiet boundaries, and no raster artwork or decorative card collage.",
+      "Blue data, amber control, and lilac sequential state cues.",
+      "Task-first layouts with readable labels and touch-sized controls.",
+      "Explicit answers in Practice; no automatic answer hints."
     ],
     "rules": [
-      { "name": "The Signal Meaning Rule", "body": "Keep blue on data, amber on control, and lilac on sequential state; do not exchange these roles for decoration.", "section": "colors" },
-      { "name": "The Value-Type Rule", "body": "Render machine values in monospace so they stay visually distinct from their explanation.", "section": "typography" },
-      { "name": "The Tonal Layer Rule", "body": "Establish depth with surface tone and quiet borders; do not add shadows as a substitute for clear grouping.", "section": "elevation" }
+      { "name": "The Signal Meaning Rule", "body": "Blue stays with data and primary actions, amber with control, and lilac with clocked state.", "section": "colors" },
+      { "name": "The Readable Workbench Rule", "body": "Keep labels and body copy at the implemented 14px and 15px baseline; reserve smaller text for dense diagram annotations that have adjacent explanation.", "section": "typography" },
+      { "name": "The Functional Depth Rule", "body": "Reserve drop shadow for the open navigation popover; use surface tone and borders to group ordinary learning content.", "section": "elevation" }
     ],
     "dos": [
-      "Do keep the dark instrument palette and the established blue, amber, and lilac signal roles.",
-      "Do keep machine values in monospace and explanation text in the system sans-serif.",
-      "Do let the work area adapt to the actual viewport; preserve a pannable datapath when needed.",
-      "Do keep keyboard focus visible and respect reduced-motion preferences."
+      "Do keep the dark slate workbench and the established data, control, and state color roles.",
+      "Do use concise, task-specific guidance and let learners request help when they want it.",
+      "Do preserve the 44px control baseline and 14px navigation/label scale.",
+      "Do put the task and relevant state before the wide diagram on narrow screens.",
+      "Do support pointer, touch, and keyboard field placement, visible focus, and reduced motion."
     ],
     "donts": [
-      "Don't introduce a light theme, neon overload, or distracting gamification; the product contract commits to a dark, calm learning environment.",
-      "Don't blur data, control, and sequential-state color roles.",
-      "Don't compress the datapath into unreadable labels on narrow screens."
+      "Don't add automatic answer hints to Practice; reveal answers only after a learner action.",
+      "Don't turn the screen into a course-branding page, a raster-art hero, or a decorative card collage.",
+      "Don't compress the datapath or instruction strip until its labels stop being readable.",
+      "Don't add shadows to ordinary panels; reserve them for the expanded mobile topic menu."
     ]
   }
 }

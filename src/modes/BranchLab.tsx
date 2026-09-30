@@ -147,8 +147,8 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       <section className="panel trainer-panel">
         <div className="trainer-heading-row">
           <div>
-            <h2 className="section-title">Predict the beq path</h2>
-            <p className="muted">Separate the control signal from the comparison result, then follow the PC mux.</p>
+            <h2 className="section-title">Calculate the next PC</h2>
+            <p className="muted">Fill in the comparison and both PC paths, then check your answer.</p>
           </div>
           <button className="button button-secondary" type="button" onClick={newQuestion}><RefreshCw size={15} /> New branch</button>
         </div>
@@ -170,7 +170,7 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
         </div>
 
         <div className="trainer-branch-exercise">
-          <div className="trainer-subheading"><strong>Your prediction</strong><span>All seven values are checked together.</span></div>
+
           <div className="trainer-form-grid trainer-branch-answer-grid">
             <label className="field trainer-field-label">
               <span>SUB result · ALU Y</span>
@@ -207,18 +207,17 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
               <input className="trainer-control mono" value={answers.nextPc} onChange={(event) => setAnswer('nextPc', event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answers.nextPc !== '' && nextPcValue === null} />
             </label>
           </div>
-          <p className="trainer-inline-note">The branch target is PC + signed offset. If Taken is false, the sequential path is PC+4.</p>
           <div className="trainer-actions">
             <button className="button button-primary" type="button" onClick={submit} disabled={!complete || check.locked}>Check branch</button>
             <button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button>
             <button className="button button-secondary" type="button" onClick={resetAnswers}><RotateCcw size={15} /> Reset answers</button>
           </div>
-          {check.assisted && !check.grade && <p className="trainer-inline-note">Reset round: practice only. Start a new branch for a scored question.</p>}
+          {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
           <Feedback grade={check.grade} />
         </div>
       </section>
 
-      <section className="panel trainer-panel trainer-branch-path" aria-label="Branch and next-PC reference">
+      <details className="trainer-extra"><summary>Follow the branch path</summary><section className="panel trainer-panel trainer-branch-path" aria-label="Branch and next-PC reference">
         <div className="trainer-heading-row"><div><h2 className="section-title">From comparison to next PC</h2><p className="muted">The instruction decoder, ALU, and PC mux each have a distinct role.</p></div></div>
         <div className="trainer-branch-signal-grid">
           <div><span>Control decoder</span><strong>Branch = {outcomeRevealed ? trace.control.branch : '?'}</strong><small>Marks this instruction as a branch.</small></div>
@@ -235,7 +234,7 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
           <li>The B-format low immediate bit is implicit zero. This Lab 4 model requires a taken target to be word-aligned (a multiple of four).</li>
           <li>The Lab 4 PC is 8 bits. PC+4 and PC+offset wrap modulo 256; for example, 252+8 wraps to 4.</li>
         </ul>
-      </section>
+      </section></details>
     </div>
   );
 }
@@ -244,7 +243,7 @@ function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   const [labCase, setLabCase] = useState<LabCase>(() => createCase('rom'));
   const [answer, setAnswer] = useState('');
   const check = useCheck('rom', onAttempt);
-  const { scenario, trace } = labCase;
+  const { trace } = labCase;
   const validNumber = parseNumber(answer);
 
   function expectedText() {
@@ -291,30 +290,28 @@ function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
           <div className="trainer-rom-address"><span>Byte PC</span><strong className="mono">{pcLabel(trace.pc)}</strong></div>
           <div className="trainer-rom-arrow" aria-hidden="true">→</div>
           <div className="trainer-rom-address"><span>ROM word index</span><strong className="mono">{check.grade ? trace.romAddress : '?'}</strong></div>
-          <div className="trainer-rom-word"><span>Instruction word at this PC</span><code className="mono">{formatValue(scenario.word, 'hex')}</code><small>This word represents <b>{trace.instruction.name}</b>.</small></div>
         </div>
 
         <div className="trainer-rom-question">
           <label className="field trainer-field-label">
             <span>Which ROM word index does this PC select?</span>
-          <input className="trainer-control mono" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answer !== '' && validNumber === null} aria-describedby="rom-index-help" />
+          <input className="trainer-control mono" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answer !== '' && validNumber === null}  />
           </label>
-          <p id="rom-index-help" className="trainer-inline-note">Enter a decimal number or a 32-bit hexadecimal/binary value. The PC is already word-aligned.</p>
           <div className="trainer-actions">
             <button className="button button-primary" type="button" onClick={submit} disabled={answer.trim() === '' || validNumber === null || check.locked}>Check ROM address</button>
             <button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button>
             <button className="button button-secondary" type="button" onClick={resetAnswer}><RotateCcw size={15} /> Reset answer</button>
           </div>
-          {check.assisted && !check.grade && <p className="trainer-inline-note">Reset round: practice only. Start a new fetch for a scored question.</p>}
+          {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
           <Feedback grade={check.grade} />
         </div>
       </section>
 
-      <section className="panel trainer-panel trainer-rom-explainer">
+      <details className="trainer-extra"><summary>Why divide by four?</summary><section className="panel trainer-panel trainer-rom-explainer">
         <div className="trainer-heading-row"><div><h2 className="section-title">Byte addresses and word indices</h2><p className="muted">The PC points to bytes. The ROM stores one complete 32-bit instruction per entry.</p></div></div>
         <div className="trainer-rom-equation"><span className="mono">ROM address = PC ÷ 4 = PC &gt;&gt; 2</span><span>For example, byte PC 12 selects ROM word 3.</span></div>
         <p className="trainer-inline-note">Lab 4 instruction PCs are aligned to four bytes, so the low two PC bits are zero. Dividing by four selects the word stored at that address.</p>
-      </section>
+      </section></details>
     </div>
   );
 }

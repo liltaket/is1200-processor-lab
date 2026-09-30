@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { ArrowRight, Eye, RotateCcw, Sparkles } from 'lucide-react';
 import type { ModeProps } from '../ui-types';
 import {
@@ -15,6 +16,7 @@ import {
 import type { DecodedInstruction, Instruction, InstructionFormat } from '../engine';
 import { Feedback } from './trainerFeedback';
 import type { Grade } from './trainerFeedback';
+import './instruction.css';
 
 export interface InstructionLabProps extends ModeProps {
   topic: 'formats' | 'encoding';
@@ -92,6 +94,17 @@ function fieldMap(decoded: DecodedInstruction): string {
   return segmentsFor(decoded.format).map(({ range, field }) => `${range} ${field}`).join(' · ');
 }
 
+type DragSession = {
+  field: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+  moved: boolean;
+  overRange?: string;
+};
+
 function FieldStrip({
   decoded,
   placements,
@@ -108,47 +121,201 @@ function FieldStrip({
   showHints?: boolean;
 }) {
   const segments = segmentsFor(decoded.format);
-  const [selectedSlot, setSelectedSlot] = useState(segments[0]?.range ?? '');
-  const active = segments.find(({ range }) => range === selectedSlot) ?? segments[0];
-  const expected = showHints || showCorrect ? active?.field ?? '' : '';
-  const assignment = placements[selectedSlot] ?? '';
-  const fieldOptions = [...new Set(segments.map(({ field }) => field))];
+  const rootRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const [needsPan, setNeedsPan] = useState(false);
+  useEffect(() => {
+    const element = stripRef.current;
+    if (!element) return;
+    const measure = () => setNeedsPan(element.scrollWidth > element.clientWidth + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  const draggingRef = useRef<DragSession | null>(null);
+  const movedRef = useRef(false);
+  const [dragging, setDragging] = useState<DragSession | null>(null);
+  const [selectedField, setSelectedField] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState('Select a field chip, then choose a bit range.');
+  const fieldOptions = [...new Set(segments.map(({ field }) => field))].sort();
+  const remainingFields = fieldOptions.filter((field) => !Object.values(placements).includes(field));
+  const revealMap = showCorrect || showHints;
 
-  function choose(field: string) {
-    setPlacements({ ...placements, [selectedSlot]: field });
+  function updateDrag(next: DragSession | null) {
+    draggingRef.current = next;
+    setDragging(next);
+  }
+
+  function assignField(field: string, range: string) {
+    if (disabled) return;
+    const target = segments.find((segment) => segment.range === range);
+    if (!target) return;
+    const originRange = segments.find((segment) => placements[segment.range] === field)?.range;
+    if (originRange === range) {
+      setSelectedField(null);
+      setLiveStatus(`${field} is already in bits ${range}.`);
+      return;
+    }
+
+    const displaced = placements[range];
+    const next = { ...placements };
+    if (originRange) delete next[originRange];
+    if (displaced) delete next[range];
+    next[range] = field;
+    setPlacements(next);
+    setSelectedField(null);
+    setLiveStatus(displaced
+      ? `Moved ${field} to bits ${range}; ${displaced} returned to the field bank.`
+      : originRange
+        ? `Moved ${field} from bits ${originRange} to bits ${range}.`
+        : `Placed ${field} in bits ${range}.`);
+  }
+
+  function toggleFieldSelection(field: string) {
+    if (disabled) return;
+    if (selectedField === field) {
+      setSelectedField(null);
+      setLiveStatus(`${field} selection cleared.`);
+    } else {
+      setSelectedField(field);
+      setLiveStatus(`${field} selected. Choose a bit range to place or move it.`);
+    }
+  }
+
+  function activateRange(range: string) {
+    if (disabled) return;
+    if (movedRef.current) {
+      movedRef.current = false;
+      return;
+    }
+    if (selectedField) {
+      assignField(selectedField, range);
+      return;
+    }
+    const placed = placements[range];
+    if (placed) {
+      setSelectedField(placed);
+      setLiveStatus(`${placed} selected from bits ${range}. Choose another range to move it.`);
+    } else {
+      setLiveStatus('Select a field chip first, then activate a bit range.');
+    }
+  }
+
+  function startDrag(field: string, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (disabled || !event.isPrimary || event.button !== 0) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    movedRef.current = false;
+    updateDrag({
+      field,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+    });
+  }
+
+  function pointerRangeAt(x: number, y: number): string | undefined {
+    const hit = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-slot-range]');
+    return hit && rootRef.current?.contains(hit) ? hit.dataset.slotRange : undefined;
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const active = draggingRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    const moved = active.moved || Math.hypot(event.clientX - active.startX, event.clientY - active.startY) > 7;
+    movedRef.current = moved;
+    updateDrag({
+      ...active,
+      x: event.clientX,
+      y: event.clientY,
+      moved,
+      overRange: moved ? pointerRangeAt(event.clientX, event.clientY) : undefined,
+    });
+  }
+
+  function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    const active = draggingRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    const moved = active.moved || Math.hypot(event.clientX - active.startX, event.clientY - active.startY) > 7;
+    const range = moved ? pointerRangeAt(event.clientX, event.clientY) : undefined;
+    if (range) {
+      movedRef.current = true;
+      assignField(active.field, range);
+    } else if (moved) {
+      movedRef.current = true;
+      setLiveStatus(`Drop ${active.field} on a bit range. The field remains where it started.`);
+    }
+    updateDrag(null);
+    if (moved) window.setTimeout(() => { movedRef.current = false; }, 0);
+  }
+
+  function cancelPointerDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const active = draggingRef.current;
+    if (!active || active.pointerId !== event.pointerId) return;
+    updateDrag(null);
+    movedRef.current = false;
+    setLiveStatus(`Drag cancelled. ${active.field} remains where it started.`);
   }
 
   return (
-    <div className="trainer-field-strip-wrap">
-      <div className="trainer-field-strip-scroll" role="region" aria-label="Scrollable 32-bit field layout" tabIndex={0}>
-        <div className="trainer-field-strip" role="group" aria-label={`${FORMAT_NAMES[decoded.format]} instruction bit fields`}>
+    <div
+      ref={rootRef}
+      className="instruction-field-placement"
+      aria-describedby={disabled ? undefined : "instruction-field-help instruction-field-keyboard-help"}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={cancelPointerDrag}
+    >
+      <p id="instruction-field-help" className="instruction-placement-help">Drag a field onto its bit range, or select a field and tap a range.</p>
+      <p id="instruction-field-keyboard-help" className="instruction-visually-hidden">Keyboard: focus a field chip and press Enter to select it, then focus a range and press Enter to place it. Focus an occupied range and press Enter to select its field for moving.</p>
+      {!disabled && remainingFields.length > 0 && <div className="instruction-field-bank" role="group" aria-label="Available instruction fields">
+        <div className="instruction-field-bank-items">
+          {remainingFields.map((field) => <button
+            type="button"
+            key={field}
+            className={`instruction-field-chip ${selectedField === field ? 'is-selected' : ''}`}
+            aria-pressed={selectedField === field}
+            onPointerDown={(event) => startDrag(field, event)}
+            onClick={() => {
+              if (movedRef.current) { movedRef.current = false; return; }
+              toggleFieldSelection(field);
+            }}
+          >{field}</button>)}
+        </div>
+      </div>}
+      <div ref={stripRef} className="instruction-field-strip-scroll" role="region" aria-label="Scrollable 32-bit field layout" tabIndex={0}>
+        <div className={`instruction-bit-strip ${decoded.format === 'B' ? 'instruction-b-strip' : ''}`} role="group" aria-label={`${FORMAT_NAMES[decoded.format]} instruction bit fields`}>
           {segments.map((segment) => {
             const placed = placements[segment.range] ?? '';
-            const show = showHints || showCorrect;
+            const showExpected = revealMap;
             const shortPlaced = segments.find(({ field }) => field === placed)?.short;
-            const label = show ? segment.short : shortPlaced || '?';
-            const correct = showCorrect || (disabled && placed === segment.field);
+            const label = showExpected ? segment.short : shortPlaced || '?';
+            const isCorrect = showCorrect && placed === segment.field;
+            const isIncorrect = showCorrect && Boolean(placed) && placed !== segment.field;
+            const overTarget = dragging?.overRange === segment.range;
             return <button
               type="button"
               key={segment.range}
-              className={`trainer-bit-slot ${selectedSlot === segment.range ? 'is-selected' : ''} ${correct ? 'is-correct' : ''} ${disabled && !showCorrect && placed && placed !== segment.field ? 'is-incorrect' : ''}`}
+              data-slot-range={segment.range}
+              className={`instruction-bit-slot ${placed ? 'is-filled' : ''} ${overTarget ? 'is-drop-target' : ''} ${selectedField && placed === selectedField ? 'is-moving' : ''} ${isCorrect ? 'is-correct' : ''} ${isIncorrect ? 'is-incorrect' : ''} ${showHints && !showCorrect ? 'has-hint' : ''}`}
               style={{ gridColumn: `span ${segment.span}` }}
-              aria-pressed={selectedSlot === segment.range}
-              aria-label={`Bits ${segment.range}; ${show ? `field ${segment.field}` : placed ? `assigned ${placed}` : 'no field assigned'}`}
-              title={show ? `Instruction bits ${segment.range} · ${segment.field}` : `Instruction bits ${segment.range}`}
-              onClick={() => setSelectedSlot(segment.range)}
-            ><span className="trainer-bit-range">{segment.range}</span><strong>{label}</strong></button>;
+              aria-pressed={Boolean(placed && selectedField === placed)}
+              aria-label={`Bits ${segment.range}; ${showExpected ? `field ${segment.field}` : placed ? `assigned ${placed}` : 'empty range'}`}
+              title={showExpected ? `Bits ${segment.range} · ${segment.field}` : `Instruction bits ${segment.range}`}
+              disabled={disabled}
+              onPointerDown={(event) => { if (placed) startDrag(placed, event); }}
+              onClick={() => activateRange(segment.range)}
+            ><span className="instruction-bit-range">{segment.range}</span><strong>{label}</strong></button>;
           })}
         </div>
       </div>
-      <div className="trainer-slot-editor">
-        <span className="trainer-slot-selection">Selected slot: <strong>bits {selectedSlot}</strong>{expected && <> · expected <strong>{expected}</strong></>}</span>
-        <label className="field trainer-field-label"><span>Place a field in bits {selectedSlot}</span><select className="trainer-control" value={assignment} onChange={(event) => choose(event.target.value)} disabled={disabled}><option value="">Choose a field</option>{fieldOptions.map((field) => <option key={field} value={field}>{field}</option>)}</select></label>
-      </div>
-      {(showHints || disabled) && <div className="trainer-segment-reference" aria-label="Bit ranges and field names">
-        {segments.map(({ range, field }) => <span key={range}><b>{range}</b> {field}</span>)}
-      </div>}
-      {decoded.format === 'B' && (showHints || disabled) && <p className="trainer-inline-note"><strong>B immediate:</strong> imm[12], imm[10:5], imm[4:1] and imm[11] are scattered across the word. Bit 0 is implicit zero because branch offsets are even byte displacements.</p>}
+      {needsPan && <p className="instruction-pan-note">Scroll sideways for all bit ranges.</p>}
+      {dragging?.moved && <div className="instruction-drag-ghost" aria-hidden="true" style={{ left: dragging.x + 12, top: dragging.y + 12 }}>{dragging.field}</div>}
+      <p className="instruction-placement-status instruction-visually-hidden" role="status" aria-live="polite">{liveStatus}</p>
+      {decoded.format === 'B' && <details className="instruction-how-fields"><summary>How fields work</summary><p>B-type keeps the register and control fields in their usual positions, while the signed branch displacement is split across the word. Its lowest displacement bit is implicit zero because offsets are even.</p></details>}
     </div>
   );
 }
@@ -201,6 +368,7 @@ function FormatsMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guide
   const [grade, setGrade] = useState<Grade | null>(null);
   const [locked, setLocked] = useState(false);
   const [assisted, setAssisted] = useState(false);
+  const [layoutKey, setLayoutKey] = useState(0);
   const segments = segmentsFor(example.decoded.format);
   const correct = segments.every(({ range, field }) => placements[range] === field);
   const placementsReady = segments.every(({ range }) => Boolean(placements[range]));
@@ -210,11 +378,11 @@ function FormatsMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guide
     : `${FORMAT_NAMES[example.decoded.format]} fields occupy fixed positions. Compare the named segment ranges and field roles; register ports use the instruction fields shown by the decoder.`;
 
   function fresh() {
-    setExample(makeInstructionCase(example.decoded.name)); setPlacements({}); setGrade(null); setLocked(false); setAssisted(false);
+    setExample(makeInstructionCase(example.decoded.name)); setPlacements({}); setGrade(null); setLocked(false); setAssisted(false); setLayoutKey((value) => value + 1);
   }
 
   function reset() {
-    setPlacements({}); setGrade(null); setLocked(false); setAssisted(true);
+    setPlacements({}); setGrade(null); setLocked(false); setAssisted(true); setLayoutKey((value) => value + 1);
   }
 
   function submit() {
@@ -223,27 +391,27 @@ function FormatsMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guide
     if (counted) onAttempt('formats', correct);
     setGrade({ correct, expected, explanation: why, component: 'Instruction decoder · bit-field selection', counted });
     setLocked(true);
+    setLayoutKey((value) => value + 1);
     if (!correct) setAssisted(true);
   }
 
   function reveal() {
     if (locked) return;
     setGrade(localFormatGrade(false, expected, why, 'Instruction decoder · bit-field selection', true));
-    setLocked(true); setAssisted(true);
+    setLocked(true); setAssisted(true); setLayoutKey((value) => value + 1);
   }
 
   return (
-    <div className="trainer-stack">
+    <div className="instruction-lab trainer-stack">
       <section className="panel trainer-panel">
-        <div className="trainer-heading-row"><div><h2 className="section-title">Place the instruction fields</h2><p className="muted">Click a bit range, then choose the field that belongs there. The strip reads from bit 31 down to bit 0.</p></div><button className="button button-secondary" onClick={fresh}><Sparkles size={15} /> New instruction</button></div>
-        <div className="trainer-instruction-sample"><span className="trainer-sample-mnemonic">{example.decoded.name}</span><code className="mono">{example.source}</code><span>{FORMAT_NAMES[example.decoded.format]}</span></div>
-        <FieldStrip key={example.word} decoded={example.decoded} placements={placements} setPlacements={setPlacements} disabled={locked} showCorrect={Boolean(grade)} showHints={guided} />
-        {guided && <p className="trainer-inline-note">Guided hints show every field range. This round is not scored toward mastery. For B-type, the immediate is a reconstruction rule, not one contiguous slice.</p>}
-        <div className="trainer-actions"><button className="button button-primary" onClick={submit} disabled={locked || !placementsReady}>Check field positions</button><button className="button button-secondary" onClick={reveal} disabled={locked}><Eye size={15} /> Reveal layout</button><button className="button button-secondary" onClick={reset}><RotateCcw size={15} /> Reset layout</button></div>
-        {assisted && !grade && <p className="trainer-inline-note">Reset round is practice only. Start a new instruction for a scored check.</p>}
+        <div className="trainer-heading-row"><div><h2 className="section-title">Place the instruction fields</h2>{guided && <span className="instruction-guided-badge">Guided · unscored</span>}</div><button className="button button-secondary" onClick={fresh}><Sparkles size={15} /> New instruction</button></div>
+        <div className="trainer-instruction-sample"><code className="mono">{example.source}</code><span>{FORMAT_NAMES[example.decoded.format]}</span></div>
+        <FieldStrip key={`${example.word}-${layoutKey}`} decoded={example.decoded} placements={placements} setPlacements={setPlacements} disabled={locked} showCorrect={Boolean(grade)} showHints={guided} />
+        <div className="trainer-actions"><button className="button button-primary" onClick={submit} disabled={locked || !placementsReady}>Check layout</button><button className="button button-secondary" onClick={reveal} disabled={locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" onClick={reset}><RotateCcw size={15} /> Reset</button></div>
+        {assisted && !grade && <p className="instruction-round-status">This reset round is unscored.</p>}
         <Feedback grade={grade} />
       </section>
-      {grade && <section className="panel trainer-panel trainer-afterword"><h2 className="section-title">Decoded operands</h2><div className="trainer-field-values">{segments.map(({ field }) => <div key={field}><span>{field}</span><strong className="mono">{fieldDisplay(field, example.decoded)}</strong></div>)}</div><p className="muted">The field names describe instruction bits. A1/A2/A3 are physical register addresses derived from register fields; the register file values are data on the read ports.</p></section>}
+      {grade && <section className="panel trainer-panel trainer-afterword"><h2 className="section-title">Decoded operands</h2><div className="trainer-field-values">{segments.map(({ field }) => <div key={field}><span>{field}</span><strong className="mono">{fieldDisplay(field, example.decoded)}</strong></div>)}</div></section>}
     </div>
   );
 }
@@ -259,6 +427,7 @@ function EncodingMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guid
   const [grade, setGrade] = useState<Grade | null>(null);
   const [locked, setLocked] = useState(false);
   const [assisted, setAssisted] = useState(false);
+  const [layoutKey, setLayoutKey] = useState(0);
   const opFields = operandsFor(example.decoded);
   const encodedWord = encode(example.instruction);
   const opcodeOptions = [...new Set(LAB_INSTRUCTIONS.map((name) => formatValue(INSTRUCTIONS[name].opcode, 'hex')))];
@@ -275,15 +444,15 @@ function EncodingMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guid
     : stage === 1 ? 'Opcode field'
       : stage === 2 ? 'Register and immediate fields'
         : stage === 3 ? 'Instruction bit-field layout'
-          : 'Canonical instruction encoder';
+          : 'Complete instruction word';
   const currentWhy = stage === 0 ? `${example.decoded.name} uses the ${FORMAT_NAMES[example.decoded.format]} layout.`
     : stage === 1 ? `The ${FORMAT_NAMES[example.decoded.format]} ${example.decoded.name} definition assigns opcode ${formatValue(example.decoded.opcode, 'hex')}. This is the encoded family field.`
-      : stage === 2 ? 'Register operands keep their declared rs1/rs2/rd roles. Immediate operands are signed values that the encoder packs according to the format.'
+      : stage === 2 ? 'Register operands keep their rs1/rs2/rd roles. Immediate operands are signed; the format determines where their bits go.'
         : stage === 3 ? example.decoded.format === 'B' ? 'B immediate bits are scattered; bit 0 is implicit zero. The other fields keep their positions across R, I and B formats.' : 'Register and function fields occupy the positions defined by the selected instruction format.'
           : 'The complete instruction word combines its opcode, operands, function bits and format-specific immediate layout.';
   const operandsComplete = opFields.every(({ key }) => Boolean(answers.operands[key]));
   const fullWord = parseHexWord(answers.hex);
-  const stageLabels = ['Format', 'Opcode', 'Operands', 'Field placement', '32-bit word'];
+  const stageTitles = ['Choose the format', 'Identify the opcode', 'Read the operands', 'Place the fields', 'Enter the full word'];
 
   function isCorrect(): boolean {
     if (stage === 0) return answers.family === example.decoded.format;
@@ -300,26 +469,27 @@ function EncodingMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guid
     if (counted) onAttempt('encoding', correct);
     setGrade({ correct, expected: currentExpected, explanation: currentWhy, component: currentComponent, counted });
     setLocked(true);
+    setLayoutKey((value) => value + 1);
     if (!correct) setAssisted(true);
   }
 
   function reveal() {
     if (locked) return;
     setGrade(localFormatGrade(false, currentExpected, currentWhy, currentComponent, true));
-    setLocked(true); setAssisted(true);
+    setLocked(true); setAssisted(true); setLayoutKey((value) => value + 1);
   }
 
   function nextStage() {
     if (!grade || stage === 4) return;
-    setStage((stage + 1) as Stage); setGrade(null); setLocked(false);
+    setStage((stage + 1) as Stage); setGrade(null); setLocked(false); setLayoutKey((value) => value + 1);
   }
 
   function reset() {
-    setStage(0); setAnswers(blankEncodeAnswers()); setGrade(null); setLocked(false); setAssisted(true);
+    setStage(0); setAnswers(blankEncodeAnswers()); setGrade(null); setLocked(false); setAssisted(true); setLayoutKey((value) => value + 1);
   }
 
   function fresh() {
-    setExample(makeInstructionCase(example.decoded.name)); setStage(0); setAnswers(blankEncodeAnswers()); setGrade(null); setLocked(false); setAssisted(false);
+    setExample(makeInstructionCase(example.decoded.name)); setStage(0); setAnswers(blankEncodeAnswers()); setGrade(null); setLocked(false); setAssisted(false); setLayoutKey((value) => value + 1);
   }
 
   const stageReady = stage === 0 ? Boolean(answers.family)
@@ -329,26 +499,25 @@ function EncodingMode({ onAttempt, guided }: Pick<ModeProps, 'onAttempt' | 'guid
           : fullWord !== null;
 
   return (
-    <div className="trainer-stack">
+    <div className="instruction-lab trainer-stack">
       <section className="panel trainer-panel">
-        <div className="trainer-heading-row"><div><h2 className="section-title">Build the encoding in five passes</h2><p className="muted">First identify the instruction family; then enter the fields and let the shared encoder verify the word.</p></div><button className="button button-secondary" onClick={fresh}><Sparkles size={15} /> New instruction</button></div>
-        <ol className="trainer-stage-list" aria-label="Encoding practice steps">{stageLabels.map((label, index) => <li key={label} className={`${index === stage ? 'is-current' : ''} ${index < stage ? 'is-done' : ''}`}><span>{index + 1}</span>{label}</li>)}</ol>
-        <div className="trainer-instruction-sample"><span className="trainer-sample-mnemonic">{example.decoded.name}</span><code className="mono">{example.source}</code><span>{stage === 0 ? 'Identify the format family.' : `Round ${stage + 1} of 5 · ${stageLabels[stage]}`}</span></div>
+        <div className="trainer-heading-row"><div><h2 className="section-title">Build an instruction word</h2>{guided && <span className="instruction-guided-badge">Guided · unscored</span>}</div><button className="button button-secondary" onClick={fresh}><Sparkles size={15} /> New instruction</button></div>
+        <div className="instruction-stage-head"><div><span>Step {stage + 1} of 5</span><h3>{stageTitles[stage]}</h3></div><div className="instruction-stage-progress" role="progressbar" aria-label="Encoding progress" aria-valuemin={1} aria-valuemax={5} aria-valuenow={stage + 1}><span style={{ width: `${((stage + 1) / 5) * 100}%` }} /></div></div>
+        <div className="trainer-instruction-sample"><code className="mono">{example.source}</code></div>
         {stage === 0 && <label className="field trainer-field-label"><span>Instruction format family</span><select className="trainer-control" value={answers.family} onChange={(event) => setAnswers({ ...answers, family: event.target.value })} disabled={locked}><option value="">Choose R, I or B</option>{(['R', 'I', 'B'] as InstructionFormat[]).map((format) => <option key={format} value={format}>{FORMAT_NAMES[format]}</option>)}</select></label>}
         {stage === 1 && <label className="field trainer-field-label"><span>Encoded opcode field</span><select className="trainer-control mono" value={answers.opcode} onChange={(event) => setAnswers({ ...answers, opcode: event.target.value })} disabled={locked}><option value="">Choose the seven-bit opcode</option>{opcodeOptions.map((opcode) => <option key={opcode} value={opcode}>{opcode}</option>)}</select></label>}
-        {stage === 2 && <><p className="trainer-inline-note">Select the register operands and enter the signed immediate, if this instruction has one.</p><OperandEditor decoded={example.decoded} values={answers.operands} setValues={(operands) => setAnswers({ ...answers, operands })} disabled={locked} /></>}
-        {guided && <p className="trainer-inline-note">Guided build: checks are not scored toward mastery. Advance through the steps to see how named fields make the encoded word.</p>}
-        {stage === 3 && <><p className="trainer-inline-note">Click each bit slot, then assign its field. You can use the keyboard with the buttons and native field selector.</p><FieldStrip key={`${example.word}-${stage}`} decoded={example.decoded} placements={answers.placements} setPlacements={(placements) => setAnswers({ ...answers, placements })} disabled={locked} showCorrect={Boolean(grade)} /></>}
+        {stage === 2 && <><p className="instruction-prompt">Enter the register and immediate operands shown in the instruction.</p><OperandEditor decoded={example.decoded} values={answers.operands} setValues={(operands) => setAnswers({ ...answers, operands })} disabled={locked} /></>}
+        {stage === 3 && <FieldStrip key={`${example.word}-${stage}-${layoutKey}`} decoded={example.decoded} placements={answers.placements} setPlacements={(placements) => setAnswers({ ...answers, placements })} disabled={locked} showCorrect={Boolean(grade)} showHints={guided} />}
         {stage === 4 && <label className="field trainer-field-label"><span>Complete 32-bit instruction · hexadecimal</span><input className="trainer-control mono" value={answers.hex} onChange={(event) => setAnswers({ ...answers, hex: event.target.value })} placeholder="0x00000000" disabled={locked} aria-invalid={Boolean(answers.hex) && fullWord === null} /></label>}
         <div className="trainer-actions">
-          <button className="button button-primary" onClick={submit} disabled={!stageReady || locked}>{stage === 4 ? 'Check 32-bit word' : `Check ${stageLabels[stage].toLowerCase()}`}</button>
-          <button className="button button-secondary" onClick={reveal} disabled={locked}><Eye size={15} /> Reveal this step</button>
-          <button className="button button-secondary" onClick={reset}><RotateCcw size={15} /> Reset example</button>
+          <button className="button button-primary" onClick={submit} disabled={!stageReady || locked}>Check answer</button>
+          <button className="button button-secondary" onClick={reveal} disabled={locked}><Eye size={15} /> Reveal answer</button>
+          <button className="button button-secondary" onClick={reset}><RotateCcw size={15} /> Reset</button>
         </div>
-        {assisted && !grade && <p className="trainer-inline-note">Practice reset or reveal used: later checks are unscored. Start a new instruction for a fresh scored round.</p>}
+        {assisted && !grade && <p className="instruction-round-status">This round is unscored after a reset, reveal, or incorrect answer.</p>}
         <Feedback grade={grade} />
-        {grade && stage < 4 && <button className="button button-primary trainer-next-step" onClick={nextStage}>Continue to {stageLabels[stage + 1]} <ArrowRight size={15} /></button>}
-        {grade && stage === 4 && <div className="trainer-final-word"><span>Complete 32-bit instruction word</span><strong className="mono">{expectHex}</strong><code>{formatValue(encodedWord, 'binary')}</code></div>}
+        {grade && stage < 4 && <button className="button button-primary trainer-next-step" onClick={nextStage}>Next step <ArrowRight size={15} /></button>}
+        {grade && stage === 4 && <><div className="trainer-final-word"><span>Complete 32-bit instruction word</span><strong className="mono">{expectHex}</strong><code>{formatValue(encodedWord, 'binary')}</code></div><div className="instruction-encoded-fields" aria-label="Encoded instruction fields">{layoutSegments.map(({ range, field }) => <div key={range}><span>Bits {range} · {field}</span><strong className="mono">{fieldDisplay(field, example.decoded)}</strong></div>)}</div></>}
       </section>
     </div>
   );
