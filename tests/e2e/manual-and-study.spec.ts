@@ -19,7 +19,7 @@ function responseFor(answer: string, id: string): string {
 }
 
 test('manual beq keeps the branch target pending until the rising edge', async ({ page }) => {
-  await page.goto('/#/datapath');
+  await page.goto('./#/datapath');
   const exercise = page.getByRole('region', { name: 'Manual trace exercise' });
   const steps = firstBeqSteps();
 
@@ -52,7 +52,7 @@ test('manual beq keeps the branch target pending until the rising edge', async (
 });
 
 test('clock timing choices freeze after grading', async ({ page }) => {
-  await page.goto('/#/clock');
+  await page.goto('./#/clock');
   await page.getByRole('button', { name: 'Rising clock edge' }).click();
   await page.getByRole('button', { name: 'Check timing' }).click();
   await expect(page.getByRole('button', { name: 'Rising clock edge' })).toBeDisabled();
@@ -61,7 +61,7 @@ test('clock timing choices freeze after grading', async ({ page }) => {
 });
 
 test('oral guide can be revealed and self-graded once', async ({ page }) => {
-  await page.goto('/#/oral');
+  await page.goto('./#/oral');
   await page.getByLabel('Your notes').fill('PCnext is calculated combinationally and captured by PC at the rising edge.');
   await page.getByRole('button', { name: 'Reveal answer guide' }).click();
   await expect(page.getByText('Expected concepts')).toBeVisible();
@@ -72,7 +72,7 @@ test('oral guide can be revealed and self-graded once', async ({ page }) => {
 });
 
 test('factorial examples 0, 3, and 8 run to a self-loop with the expected result', async ({ page }) => {
-  await page.goto('/#/factorial');
+  await page.goto('./#/factorial');
   const input = page.getByLabel('Demonstration input n');
   for (const [n, expected] of [[0, 1], [3, 6], [8, 40320]]) {
     await input.selectOption(String(n));
@@ -84,7 +84,7 @@ test('factorial examples 0, 3, and 8 run to a self-loop with the expected result
 });
 
 test('factorial rejects invalid edited source without advancing CPU state', async ({ page }) => {
-  await page.goto('/#/factorial');
+  await page.goto('./#/factorial');
   const source = page.getByLabel(/Lab 4 assembly/);
   await source.fill('addi t2, x0\n');
   await page.getByRole('button', { name: 'Assemble edits' }).click();
@@ -94,7 +94,7 @@ test('factorial rejects invalid edited source without advancing CPU state', asyn
 });
 
 test('hex import validates the words and runs to its self-branching stop loop', async ({ page }) => {
-  await page.goto('/#/factorial');
+  await page.goto('./#/factorial');
   await page.locator('input[type="file"]').setInputFiles({
     name: 'known.hex',
     mimeType: 'text/plain',
@@ -109,7 +109,7 @@ test('hex import validates the words and runs to its self-branching stop loop', 
 });
 
 test('assisted factorial prediction is not counted as a correct attempt', async ({ page }) => {
-  await page.goto('/#/factorial');
+  await page.goto('./#/factorial');
   await page.getByRole('button', { name: 'Show expected value' }).click();
   await page.getByRole('button', { name: 'Check prediction' }).click();
   await expect(page.getByText(/assisted or repeated check was not counted/)).toBeVisible();
@@ -117,15 +117,15 @@ test('assisted factorial prediction is not counted as a correct attempt', async 
 });
 
 test('hash navigation selects the matching topic and unknown topics fall back safely', async ({ page }) => {
-  await page.goto('/#/datapath');
+  await page.goto('./#/datapath');
   await page.locator('.sidebar nav').getByRole('link', { name: 'Branch' }).click();
   await expect(page.locator('.breadcrumb')).toContainText('Branch');
-  await page.goto('/#/not-a-topic');
+  await page.goto('./#/not-a-topic');
   await expect(page.locator('.breadcrumb')).toContainText('Datapath');
 });
 
 test('recorded progress persists after reload', async ({ page }) => {
-  await page.goto('/#/clock');
+  await page.goto('./#/clock');
   await page.getByRole('button', { name: 'Immediate propagation' }).click();
   await page.getByRole('button', { name: 'Check timing' }).click();
   await expect(page.locator('.session-summary')).toContainText('1 attempt');
@@ -138,13 +138,13 @@ test('application stays usable when local storage is blocked', async ({ page }) 
   await page.addInitScript(() => {
     Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked'); } });
   });
-  await page.goto('/#/datapath');
+  await page.goto('./#/datapath');
   await expect(page.getByRole('heading', { name: 'Be the processor.' })).toBeVisible();
   await expect(page.getByText('Storage unavailable · session only')).toBeVisible();
 });
 
 test('keyboard skip link focuses main without changing the topic hash', async ({ page }) => {
-  await page.goto('/#/branch');
+  await page.goto('./#/branch');
   await page.keyboard.press('Tab');
   const skipLink = page.getByRole('link', { name: 'Skip to practice' });
   await expect(skipLink).toBeFocused();
@@ -154,7 +154,7 @@ test('keyboard skip link focuses main without changing the topic hash', async ({
 });
 
 test('SVG datapath component can be opened with Enter', async ({ page }) => {
-  await page.goto('/#/datapath');
+  await page.goto('./#/datapath');
   const rom = page.getByRole('button', { name: 'Explore Instruction ROM' });
   await rom.focus();
   await page.keyboard.press('Enter');
@@ -163,7 +163,7 @@ test('SVG datapath component can be opened with Enter', async ({ page }) => {
 });
 
 test('register reads change immediately and writes to x0 remain ignored', async ({ page }) => {
-  await page.goto('/#/registers');
+  await page.goto('./#/registers');
   await expect(page.locator('.trainer-read-ports')).toContainText('42');
   await page.getByLabel('A1 · read address 1').selectOption('6');
   await expect(page.locator('.trainer-read-ports')).toContainText('-19');
@@ -176,7 +176,7 @@ test('register reads change immediately and writes to x0 remain ignored', async 
 });
 
 test('ALU grades a signed overflow result as a wrapped 32-bit value', async ({ page }) => {
-  await page.goto('/#/alu');
+  await page.goto('./#/alu');
   await page.getByLabel('Predicted Y').fill('-2147483648');
   await page.getByLabel('Predicted Zero').selectOption('0');
   await page.getByRole('button', { name: 'Check outputs' }).click();
@@ -185,7 +185,7 @@ test('ALU grades a signed overflow result as a wrapped 32-bit value', async ({ p
 });
 
 test('control exercise distinguishes encoded fields from four generated signals', async ({ page }) => {
-  await page.goto('/#/control');
+  await page.goto('./#/control');
   const mnemonic = (await page.locator('.trainer-sample-mnemonic').textContent())?.trim();
   const values = mnemonic === 'beq'
     ? { opcode: '0x00000063', regWrite: '0', aluSrc: '0', branch: '1', aluControl: '001' }
@@ -202,7 +202,7 @@ test('control exercise distinguishes encoded fields from four generated signals'
 
 test('format field placement grades the complete R-type bit layout', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
-  await page.goto('/#/formats');
+  await page.goto('./#/formats');
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
   await expect(page.locator('.trainer-instruction-sample code')).toContainText('add ');
   const slots = [
@@ -222,7 +222,7 @@ test('format field placement grades the complete R-type bit layout', async ({ pa
 
 test('completed but incorrect field placement can be checked and graded', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
-  await page.goto('/#/formats');
+  await page.goto('./#/formats');
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const slots = [
     ['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'],
@@ -241,7 +241,7 @@ test('completed but incorrect field placement can be checked and graded', async 
 
 test('B-format assembly and scattered immediate bits are visible', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.99; });
-  await page.goto('/#/formats');
+  await page.goto('./#/formats');
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('beq', () => 0.99);
   expect(scenario.instruction.name).toBe('beq');
@@ -274,7 +274,7 @@ test('B-format assembly and scattered immediate bits are visible', async ({ page
 
 test('encoding exercise grades all five stages through the shared encoder', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
-  await page.goto('/#/encoding');
+  await page.goto('./#/encoding');
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('add', () => 0);
   await page.getByLabel('Instruction format family').selectOption('R');
@@ -308,7 +308,7 @@ test('encoding exercise grades all five stages through the shared encoder', asyn
 
 test('encoding field placement can submit a complete incorrect arrangement', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0; });
-  await page.goto('/#/encoding');
+  await page.goto('./#/encoding');
   await page.getByRole('button', { name: 'Practice', exact: true }).click();
   const scenario = generateScenario('add', () => 0);
   await page.getByLabel('Instruction format family').selectOption('R');
@@ -339,7 +339,7 @@ test('encoding field placement can submit a complete incorrect arrangement', asy
 
 test('branch prediction checks control, comparison, byte target, and selected next PC', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.5; });
-  await page.goto('/#/branch');
+  await page.goto('./#/branch');
   const scenario = generateScenario('beq', () => 0.5);
   const trace = traceCycle(scenario.state, scenario.word);
   await page.getByLabel('SUB result · ALU Y').fill(String(toSigned(trace.aluResult)));
@@ -356,7 +356,7 @@ test('branch prediction checks control, comparison, byte target, and selected ne
 
 test('ROM exercise converts a nonzero byte PC to its word index', async ({ page }) => {
   await page.addInitScript(() => { Math.random = () => 0.5; });
-  await page.goto('/#/rom');
+  await page.goto('./#/rom');
   const scenario = generateScenario('add', () => 0.5);
   const trace = traceCycle(scenario.state, scenario.word);
   expect(trace.pc).toBeGreaterThan(0);
@@ -377,7 +377,7 @@ test('all topic views fit without document overflow at 390px and 1024px', async 
   for (const width of [390, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     for (const [topic, title] of topics) {
-      await page.goto(`/#/${topic}`);
+      await page.goto(`./#/${topic}`);
       await expect(page.locator('.breadcrumb')).toContainText(title);
       const documentWidth = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
       expect(documentWidth, `${topic} at ${width}px`).toBeLessThanOrEqual(width);

@@ -37,7 +37,11 @@ npm run test:e2e
 
 Browser tests require Playwright Chromium (`npx playwright install chromium`). Progress stays in this browser's localStorage; blocked storage never prevents practicing. Session streaks reset on reload.
 
-The browser suite starts its own production preview on strict port 4180 and refuses to reuse another project's server. For a deliberately chosen running server, set `TEST_BASE_URL`.
+The browser suite starts its own production preview on strict port 4180 and refuses to reuse another project's server. For a deliberately chosen running server, set `TEST_BASE_URL`. The same tests can verify the published repository subpath:
+
+```sh
+TEST_BASE_URL=https://liltaket.github.io/is1200-processor-lab/ npm run test:e2e
+```
 
 ## Processor scope
 

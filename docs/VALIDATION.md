@@ -26,6 +26,12 @@ Desktop (1440 px), tablet (1024 px), and mobile (390 px) captures were reviewed.
 
 The trainer author's mechanical design scan reported no findings for ComponentLab, InstructionLab, BranchLab, and trainers.css. This is scoped evidence, not a claim of a whole-repository scan.
 
+## GitHub Pages verification
+
+The first deployment of commit `67a7fe3d36c5f2368f01dd058744f428344d86d5` succeeded in [workflow run 36764962157](https://github.com/liltaket/is1200-processor-lab/actions/runs/36764962157). GitHub's deployment status reported success at https://liltaket.github.io/is1200-processor-lab/.
+
+The complete Chromium suite was then run against that public URL with `TEST_BASE_URL`: all 23 tests passed. A separate direct-navigation and refresh check covered all 11 topic URLs with successful responses and no failed assets or browser errors. The browser tests use paths relative to the selected base URL so the same suite covers local previews and repository Pages subpaths.
+
 ## Limits
 
-These are local software and Chromium browser results, including responsive viewport emulation. They do not prove Safari/iPad hardware rendering, a Logisim circuit, physical hardware, or a deployed GitHub Pages site. Publication is authorized for the public repository `liltaket/is1200-processor-lab`. Its workflow runs unit, type, lint, build, and Chromium checks for PRs; pushes and merges to main additionally build with the Pages subpath and deploy. The workflow status provides CI/deployment evidence for each commit.
+These are local software and Chromium browser results, including responsive viewport emulation. They do not prove Safari/iPad hardware rendering, a Logisim circuit, or physical hardware. Published-site behavior is verified separately above in Chromium. Publication is authorized for the public repository `liltaket/is1200-processor-lab`. Its workflow runs unit, type, lint, build, and Chromium checks for PRs; pushes and merges to main additionally build with the Pages subpath and deploy. The workflow status provides CI/deployment evidence for each commit.
