@@ -163,9 +163,9 @@ The interface retains its low-glare dark slate palette and uses muted, consisten
 
 ## Layout
 
-The welcome page puts the main action and a vector circuit in a spacious two-column composition, then offers a few topic shortcuts. On small screens the circuit yields space to the welcome message and the Open lab action. Inside the workbench, topic navigation stays persistent on desktop; below 800px it becomes a native expandable Topics menu. Progress and explanatory disclosures begin closed.
+The welcome page puts the main action and a vector circuit in a spacious two-column composition, then offers a few topic shortcuts. On small screens the circuit yields space to the welcome message and the Open lab action. Inside the workbench, topic navigation stays persistent on desktop; below 800px it becomes a native expandable Topics menu with a Progress link. Progress is a dedicated `#/progress` view: native topic disclosures contain direct links to each lesson, alongside solved/reviewed counts and a confirmed reset action. Returning to a topic restores its saved lesson cursor.
 
-Manual practice leads with the current task. At medium desktop widths, the question and register state share the first row and the wide datapath follows beneath them; below 1100px the task, register state, and diagram stack in that order. On wide screens the question sits beside the diagram and register state. The diagram keeps its wide working surface inside a horizontally pannable viewport, with a visible pan cue on compact screens. Register grids move from four columns to two as space narrows. Other study and trainer panels collapse to one column at their implemented breakpoints. Controls are generally at least 44px high, and the spacing rhythm uses 4, 8, 12, 16, 22, and 30px steps.
+Manual practice leads with the current task. At medium desktop widths, the question and register state share the first row and the wide datapath follows beneath them; below 1100px the task, register state, and diagram stack in that order. On wide screens the question sits beside the diagram and register state. After a lesson outcome, the status and Next exercise or Finish series action occupy the sticky lesson-position row beneath the page heading. The datapath responds to its own available container width: compact semantic buttons appear below 1000px, and the full SVG appears at or above 1000px; neither layout requires horizontal panning. Register grids move from four columns to two as space narrows. The R/I/B field layout uses an ordered, wrapping bank and a responsive grid of exact bit ranges rather than proportional bit widths or a horizontally scrolled strip. Other study and trainer panels collapse to one column at their implemented breakpoints. Controls are generally at least 44px high, and the spacing rhythm uses 4, 8, 12, 16, 22, and 30px steps.
 
 ## Elevation & Depth
 
@@ -208,14 +208,14 @@ Controls and panels use softly squared corners, typically 5–12px; selected ins
 
 ### Navigation
 - **Style:** 14px topic labels, 44px minimum link height, and a subdued blue-slate active surface.
-- **Desktop:** Persistent topic list with Mixed review and a closed Progress disclosure beneath it.
-- **Mobile:** Native expandable Topics menu containing links, Mixed review, and a closed Progress disclosure.
+- **Desktop:** Persistent topic list and direct Progress route with a solved-count indicator.
+- **Mobile:** Native expandable Topics menu containing topic links and the Progress route; Escape closes the menu and returns focus to its summary.
 
 ### Welcome Screen
 One large welcome heading, a short invitation, and a prominent Open lab action establish the route into practice. A small inline SVG circuit connects the PC, instruction, registers, and ALU; it disappears on the narrowest screens rather than becoming decorative clutter.
 
 ### Datapath and Field Placement
-The datapath keeps the signal key visible: solid blue data, dashed amber control, and lilac state. Unknown signals remain part of the exercise; values become visible as learners answer. In the instruction field task, the available field bank is alphabetical so its order does not disclose the correct layout. R/I bit ranges retain proportional widths with a 36px minimum per bit; B-type one-bit ranges use a 44px minimum target. The 32-bit strip scrolls within its own frame while a field is dragged, tapped into place, or moved with the keyboard; show “Scroll sideways for all bit ranges” only when the strip overflows. Placement updates are announced through a screen-reader live status.
+The datapath keeps the signal key visible: solid blue data, dashed amber control, and lilac state. Unknown signals remain part of the exercise; values become visible as learners answer. In the instruction field task, the ordered field bank does not disclose the correct layout. R/I/B fields occupy labeled exact ranges in a responsive, non-scrolling grid. Placement supports pointer drag, tap selection, and keyboard operation; placement updates are announced through a screen-reader live status. Compact datapath buttons preserve the same signal roles as the full SVG.
 
 ## Do's and Don'ts
 

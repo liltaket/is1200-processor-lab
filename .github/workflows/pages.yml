@@ -24,7 +24,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

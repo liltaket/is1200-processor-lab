@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Eye, RefreshCw, RotateCcw } from 'lucide-react';
+import { Eye, RotateCcw } from 'lucide-react';
 import type { ModeProps } from '../ui-types';
+import { lessonRandom, useLesson } from '../course';
+import { NumberAnswer } from '../components/NumberAnswer';
 import {
+  createState,
+  encode,
   formatValue,
   generateScenario,
   instructionText,
   parseValue,
   traceCycle,
   toSigned,
+  toUnsigned,
 } from '../engine';
 import type { CycleTrace, Scenario } from '../engine';
 import { Feedback, useCheck } from './trainerFeedback';
@@ -21,8 +26,36 @@ type BranchAnswers = { subtraction: string; zero: string; branch: string; taken:
 
 const EMPTY_BRANCH_ANSWERS: BranchAnswers = { subtraction: '', zero: '', branch: '', taken: '', target: '', pcPlus4: '', nextPc: '' };
 
-function createCase(topic: BranchLabProps['topic']): LabCase {
-  const scenario = generateScenario(topic === 'branch' ? 'beq' : 'add');
+const BRANCH_LESSON_PLAN = [
+  { equal: true, pc: 240, offset: 16 },
+  { equal: false, pc: 12, offset: -8 },
+  { equal: false, pc: 252, offset: 8 },
+  { equal: true, pc: 16, offset: -8 },
+  { equal: false, pc: 8, offset: -16 },
+  { equal: true, pc: 236, offset: 20 },
+  { equal: false, pc: 20, offset: 4 },
+  { equal: true, pc: 4, offset: -4 },
+];
+
+function createBranchCase(index: number, rng: () => number): LabCase {
+  const plan = BRANCH_LESSON_PLAN[Math.min(index, BRANCH_LESSON_PLAN.length - 1)];
+  const state = createState('lab');
+  state.pc = plan.pc;
+  const rs1 = 1 + (index % 7);
+  const rs2 = (rs1 % 7) + 1;
+  const left = toUnsigned(Math.floor(rng() * 41) - 16);
+  const right = plan.equal ? left : toUnsigned(toSigned(left) + 1);
+  state.registers[rs1] = left;
+  state.registers[rs2] = right;
+  const instruction = { name: 'beq' as const, rs1, rs2, imm: plan.offset };
+  const scenario: Scenario = { state, instruction, word: encode(instruction) };
+  return { scenario, trace: traceCycle(scenario.state, scenario.word) };
+}
+
+function createRomCase(index: number, rng: () => number): LabCase {
+  const pcs = [12, 4, 28, 64, 128, 192, 248, 252];
+  const scenario = generateScenario('add', rng);
+  scenario.state.pc = pcs[Math.min(index, pcs.length - 1)];
   return { scenario, trace: traceCycle(scenario.state, scenario.word) };
 }
 
@@ -40,7 +73,8 @@ function pcLabel(value: number): string {
 }
 
 function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [labCase, setLabCase] = useState<LabCase>(() => createCase('branch'));
+  const lesson = useLesson('branch');
+  const [labCase] = useState<LabCase>(() => createBranchCase(lesson.index, lessonRandom('branch', lesson.index)));
   const [answers, setAnswers] = useState<BranchAnswers>(EMPTY_BRANCH_ANSWERS);
   const check = useCheck('branch', onAttempt);
   const { scenario, trace } = labCase;
@@ -98,6 +132,7 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   }
 
   function submit() {
+    if (!complete || check.locked) return;
     const correct = subtractionCorrect
       && answers.zero === String(trace.zero)
       && answers.branch === String(trace.control.branch)
@@ -111,7 +146,7 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   function reveal() {
     if (check.locked) return;
     setAnswers({
-      subtraction: String(trace.aluResult),
+      subtraction: String(toSigned(trace.aluResult)),
       zero: String(trace.zero),
       branch: String(trace.control.branch),
       taken: trace.branchTaken ? 'yes' : 'no',
@@ -131,15 +166,9 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     check.reset();
   }
 
-  function newQuestion() {
-    setLabCase(createCase('branch'));
-    setAnswers(EMPTY_BRANCH_ANSWERS);
-    check.fresh();
-  }
-
-  const complete = answers.subtraction.trim() !== '' && answers.zero !== ''
-    && answers.branch !== '' && answers.taken !== '' && answers.target.trim() !== ''
-    && answers.pcPlus4.trim() !== '' && answers.nextPc.trim() !== '';
+  const complete = subtractionValue !== null && answers.zero !== ''
+    && answers.branch !== '' && answers.taken !== '' && targetValue !== null
+    && pcPlus4Value !== null && nextPcValue !== null;
   const outcomeRevealed = Boolean(check.grade);
 
   return (
@@ -148,9 +177,7 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
         <div className="trainer-heading-row">
           <div>
             <h2 className="section-title">Calculate the next PC</h2>
-            <p className="muted">Fill in the comparison and both PC paths, then check your answer.</p>
           </div>
-          <button className="button button-secondary" type="button" onClick={newQuestion}><RefreshCw size={15} /> New branch</button>
         </div>
 
         <div className="trainer-branch-context">
@@ -171,11 +198,9 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
 
         <div className="trainer-branch-exercise">
 
+          <form onSubmit={(event) => { event.preventDefault(); submit(); }}>
           <div className="trainer-form-grid trainer-branch-answer-grid">
-            <label className="field trainer-field-label">
-              <span>SUB result · ALU Y</span>
-              <input className="trainer-control mono" value={answers.subtraction} onChange={(event) => setAnswer('subtraction', event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answers.subtraction !== '' && subtractionValue === null} />
-            </label>
+            <NumberAnswer label="SUB result · ALU Y" value={answers.subtraction} onChange={(value) => setAnswer('subtraction', value)} expected={trace.aluResult >>> 0} disabled={check.locked} />
             <label className="field trainer-field-label">
               <span>ALU Zero</span>
               <select className="trainer-control" value={answers.zero} onChange={(event) => setAnswer('zero', event.target.value)} disabled={check.locked}>
@@ -194,26 +219,18 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
                 <option value="">Choose</option><option value="yes">Yes</option><option value="no">No</option>
               </select>
             </label>
-            <label className="field trainer-field-label">
-              <span>Branch target · byte address</span>
-              <input className="trainer-control mono" value={answers.target} onChange={(event) => setAnswer('target', event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answers.target !== '' && targetValue === null} />
-            </label>
-            <label className="field trainer-field-label">
-              <span>PC+4 · byte address</span>
-              <input className="trainer-control mono" value={answers.pcPlus4} onChange={(event) => setAnswer('pcPlus4', event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answers.pcPlus4 !== '' && pcPlus4Value === null} />
-            </label>
-            <label className="field trainer-field-label">
-              <span>PCnext · byte address</span>
-              <input className="trainer-control mono" value={answers.nextPc} onChange={(event) => setAnswer('nextPc', event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answers.nextPc !== '' && nextPcValue === null} />
-            </label>
+            <NumberAnswer label="Branch target · byte address" value={answers.target} onChange={(value) => setAnswer('target', value)} expected={trace.branchTarget >>> 0} disabled={check.locked} />
+            <NumberAnswer label="PC+4 · byte address" value={answers.pcPlus4} onChange={(value) => setAnswer('pcPlus4', value)} expected={trace.pcPlus4 >>> 0} disabled={check.locked} />
+            <NumberAnswer label="PCnext · byte address" value={answers.nextPc} onChange={(value) => setAnswer('nextPc', value)} expected={trace.pcNext >>> 0} disabled={check.locked} />
           </div>
           <div className="trainer-actions">
-            <button className="button button-primary" type="button" onClick={submit} disabled={!complete || check.locked}>Check branch</button>
+            <button className="button button-primary" type="submit" disabled={!complete || check.locked}>Check branch</button>
             <button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button>
             <button className="button button-secondary" type="button" onClick={resetAnswers}><RotateCcw size={15} /> Reset answers</button>
           </div>
           {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
           <Feedback grade={check.grade} />
+          </form>
         </div>
       </section>
 
@@ -240,7 +257,8 @@ function BranchTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
 }
 
 function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [labCase, setLabCase] = useState<LabCase>(() => createCase('rom'));
+  const lesson = useLesson('rom');
+  const [labCase] = useState<LabCase>(() => createRomCase(lesson.index, lessonRandom('rom', lesson.index)));
   const [answer, setAnswer] = useState('');
   const check = useCheck('rom', onAttempt);
   const { trace } = labCase;
@@ -251,6 +269,7 @@ function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   }
 
   function submit() {
+    if (validNumber === null || check.locked) return;
     check.check(validNumber === trace.romAddress, expectedText(),
       `The PC is byte-addressed and each instruction is one 32-bit word (four bytes), so ${trace.pc} ÷ 4 selects ROM word ${trace.romAddress}.`,
       'PC · instruction ROM');
@@ -269,21 +288,13 @@ function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     check.reset();
   }
 
-  function newQuestion() {
-    setLabCase(createCase('rom'));
-    setAnswer('');
-    check.fresh();
-  }
-
   return (
     <div className="trainer-stack">
       <section className="panel trainer-panel">
         <div className="trainer-heading-row">
           <div>
             <h2 className="section-title">Find the instruction ROM word</h2>
-            <p className="muted">The processor PC is byte-addressed; the instruction ROM is indexed by 32-bit words.</p>
           </div>
-          <button className="button button-secondary" type="button" onClick={newQuestion}><RefreshCw size={15} /> New fetch</button>
         </div>
 
         <div className="trainer-rom-fetch">
@@ -292,19 +303,16 @@ function RomTrainer({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
           <div className="trainer-rom-address"><span>ROM word index</span><strong className="mono">{check.grade ? trace.romAddress : '?'}</strong></div>
         </div>
 
-        <div className="trainer-rom-question">
-          <label className="field trainer-field-label">
-            <span>Which ROM word index does this PC select?</span>
-          <input className="trainer-control mono" value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="Decimal, 0x, or 0b" disabled={check.locked} aria-invalid={answer !== '' && validNumber === null}  />
-          </label>
+        <form className="trainer-rom-question" onSubmit={(event) => { event.preventDefault(); submit(); }}>
+          <NumberAnswer label="Which ROM word index does this PC select?" value={answer} onChange={setAnswer} expected={trace.romAddress} disabled={check.locked} />
           <div className="trainer-actions">
-            <button className="button button-primary" type="button" onClick={submit} disabled={answer.trim() === '' || validNumber === null || check.locked}>Check ROM address</button>
+            <button className="button button-primary" type="submit" disabled={answer.trim() === '' || validNumber === null || check.locked}>Check answer</button>
             <button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button>
             <button className="button button-secondary" type="button" onClick={resetAnswer}><RotateCcw size={15} /> Reset answer</button>
           </div>
           {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
           <Feedback grade={check.grade} />
-        </div>
+        </form>
       </section>
 
       <details className="trainer-extra"><summary>Why divide by four?</summary><section className="panel trainer-panel trainer-rom-explainer">

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-30T21:00:27Z",
+  "generatedAt": "2026-10-01T13:17:39Z",
   "title": "Design System: IS1200 Processor Lab",
   "extensions": {
     "colorMeta": {
@@ -103,11 +103,11 @@
       "css": ".ds-field-chip { min-height: 44px; padding: 9px 12px; border: 1px solid #53647a; border-radius: 7px; background: #202a37; color: #d6e3f3; font: 550 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; } .ds-field-chip:hover:not(:disabled) { border-color: #8ba6c5; background: #29384a; } .ds-field-chip:active:not(:disabled) { cursor: grabbing; } .ds-field-chip[aria-pressed='true'] { border-color: #b5d2f2; background: #33475f; color: #f1f7ff; box-shadow: 0 0 0 2px #a9c8ed40; } .ds-field-chip:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 3px; }"
     },
     {
-      "name": "Scrollable Instruction Field Strip",
+      "name": "Responsive Instruction Field Grid",
       "kind": "custom",
-      "description": "An overflow-contained 32-bit layout; the scroll cue is shown when the strip is wider than its viewport.",
-      "html": "<div class=\"ds-field-layout\"><div class=\"ds-strip-scroll\" role=\"region\" aria-label=\"Scrollable 32-bit field layout\"><div class=\"ds-bit-strip ds-b-strip\"><button class=\"ds-bit-slot\">31 · ?</button><button class=\"ds-bit-slot ds-bit-six\">30:25 · ?</button><button class=\"ds-bit-slot\">24:20 · ?</button><button class=\"ds-bit-slot\">19:15 · ?</button></div></div><p class=\"ds-scroll-cue\">Scroll sideways for all bit ranges.</p></div>",
-      "css": ".ds-field-layout { min-width: 0; } .ds-strip-scroll { width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid #3a4859; border-radius: 9px; background: #121821; scrollbar-width: thin; scrollbar-color: #52647b #171e27; } .ds-bit-strip { display: grid; grid-template-columns: repeat(32, minmax(36px, 1fr)); width: 100%; min-width: 1152px; overflow: hidden; border-radius: 8px; background: #141b25; } .ds-bit-strip.ds-b-strip { grid-template-columns: repeat(32, minmax(44px, 1fr)); min-width: 1408px; } .ds-bit-slot { display: flex; min-width: 0; min-height: 82px; align-items: center; justify-content: center; padding: 8px 3px; border: 0; border-right: 1px solid #3d4a5b; border-radius: 0; background: #202a37; color: #d8e4f2; font: 400 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: pan-x; user-select: none; -webkit-user-select: none; } .ds-bit-slot:hover:not(:disabled) { background: #2b394b; } .ds-bit-slot:focus-visible { z-index: 2; outline: 2px solid #a7c8ed; outline-offset: -3px; } .ds-scroll-cue { margin: 10px 0 0; color: #a4afbd; font: 400 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }"
+      "description": "An ordered field bank and exact labeled bit ranges that reflow into the available width.",
+      "html": "<div class=\"ds-field-layout\" role=\"region\" aria-label=\"32-bit field layout\"><div class=\"ds-bit-strip\" role=\"group\" aria-label=\"R-type instruction bit fields\"><button class=\"ds-bit-slot\">31:25 · ?</button><button class=\"ds-bit-slot\">24:20 · ?</button><button class=\"ds-bit-slot\">19:15 · ?</button><button class=\"ds-bit-slot\">14:12 · ?</button><button class=\"ds-bit-slot\">11:7 · ?</button><button class=\"ds-bit-slot\">6:0 · ?</button></div></div>",
+      "css": ".ds-field-layout { width: 100%; max-width: 100%; border: 1px solid #3a4859; border-radius: 9px; background: #121821; } .ds-bit-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr)); gap: 8px; width: 100%; min-width: 0; padding: 8px; overflow: hidden; border-radius: 8px; background: #141b25; } .ds-bit-slot { display: flex; min-width: 0; min-height: 82px; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 12px 8px; border: 1px solid #3d4a5b; border-radius: 6px; background: #202a37; color: #d8e4f2; font: 400 14px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; touch-action: manipulation; } .ds-bit-slot:focus-visible { outline: 2px solid #a7c8ed; outline-offset: 2px; }"
     },
     {
       "name": "Datapath Signal Key",
@@ -119,12 +119,12 @@
   ],
   "narrative": {
     "northStar": "The Calm Processor Workbench",
-    "overview": "The interface is a focused technical instrument. Dark slate surfaces leave room for the mechanism, its live values, and the learner's next decision. The welcome screen offers a single Open lab action beside a small vector circuit; once inside, one clear task leads each topic. Course identity stays quiet and supporting copy stays brief.\n\nColor carries processor meaning: blue identifies data and primary actions, amber identifies control, and lilac identifies clocked state. A larger, more readable type scale keeps the instructional interface legible; the responsive layout moves the question and required state ahead of the wide diagram on smaller screens. Practice waits for a prediction or an explicit reveal before exposing an answer. Field placement works with pointer drag, tap selection, or keyboard activation.",
+    "overview": "The interface is a focused technical instrument. Dark slate surfaces leave room for the mechanism, its live values, and the learner's next decision. The welcome screen offers a single Open lab action beside a small vector circuit; once inside, one clear task leads each topic. A dedicated progress view shows lesson completion and direct exercise links.\n\nColor carries processor meaning: blue identifies data and primary actions, amber identifies control, and lilac identifies clocked state. Readable type and responsive layouts keep tasks available at narrow widths. The datapath switches from semantic controls to a full SVG as container space permits, while instruction fields reflow into exact-range grids. Practice waits for a prediction or explicit reveal before exposing an answer.",
     "keyCharacteristics": [
-      "Dark slate instrument surfaces, quiet boundaries, and no raster artwork or decorative card collage.",
-      "Blue data, amber control, and lilac sequential state cues.",
-      "Task-first layouts with readable labels and touch-sized controls.",
-      "Explicit answers in Practice; no automatic answer hints."
+      "Dark slate instrument surfaces with quiet boundaries and vector diagrams.",
+      "Blue data, amber control, and lilac sequential-state cues.",
+      "Lesson-level progress is distinct from prediction accuracy.",
+      "Responsive, task-first layouts with readable labels and touch-sized controls."
     ],
     "rules": [
       { "name": "The Signal Meaning Rule", "body": "Blue stays with data and primary actions, amber with control, and lilac with clocked state.", "section": "colors" },
@@ -141,7 +141,7 @@
     "donts": [
       "Don't add automatic answer hints to Practice; reveal answers only after a learner action.",
       "Don't turn the screen into a course-branding page, a raster-art hero, or a decorative card collage.",
-      "Don't compress the datapath or instruction strip until its labels stop being readable.",
+      "Don't compress processor diagrams or labeled instruction ranges until they stop being readable.",
       "Don't add shadows to ordinary panels; reserve them for the expanded mobile topic menu."
     ]
   }

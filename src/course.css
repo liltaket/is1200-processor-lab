@@ -1,0 +1,26 @@
+.workspace{min-width:0}.nav-count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.lesson-position{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:-8px 0 24px;color:var(--muted);font-size:15px}
+.lesson-position a{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:#c0d2e8}
+.lesson-position a:hover{text-decoration:underline}
+.lesson-position.is-ready{position:sticky;top:8px;z-index:6;background:var(--canvas);padding:10px 0;border-bottom:1px solid #40536b}
+.lesson-position>span>strong{display:block;font-size:14px;font-weight:500;color:#b6d2c1;margin-top:4px}.lesson-position .button{flex-shrink:0}
+html{scroll-padding-top:110px}.cleaned-shell :is(button,a,input,select,textarea,summary){scroll-margin-top:110px}
+.cleaned-shell .trainer-rom-fetch{grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr)}
+@media(max-width:980px){.cleaned-shell .trainer-rom-fetch{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.number-answer{min-width:0;width:100%}.number-answer select,.number-answer input{max-width:100%;width:100%}
+.course-overview{max-width:1000px}.course-total strong{display:block;font-size:40px;font-weight:550;font-variant-numeric:tabular-nums}.course-total strong span{font-size:19px;color:var(--muted)}
+.course-total progress{display:block;margin-top:20px;width:100%;height:8px;accent-color:var(--green);border:0;border-radius:4px;overflow:hidden;background:#293440}
+.course-total progress::-webkit-progress-bar{background:#293440}.course-total progress::-webkit-progress-value{background:var(--green)}.course-total progress::-moz-progress-bar{background:var(--green)}
+.progress-key{color:var(--muted);font-size:15px;line-height:1.7;max-width:680px;margin:24px 0 30px}.course-topics{border-top:1px solid var(--border)}
+.course-topic{border-bottom:1px solid var(--border);margin:0;padding:0}.course-topic>summary{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;cursor:pointer;list-style:none;font-size:17px;padding:14px 2px}
+.course-topic>summary::-webkit-details-marker{display:none}.course-topic>summary>span:last-child{display:flex;gap:12px;align-items:center;color:var(--muted);font-size:15px}.course-topic[open]>summary svg{transform:rotate(180deg)}
+.exercise-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:10px;margin:4px 0 24px}.exercise-link{border:1px solid #414d5d;border-radius:7px;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:12px 14px;min-height:70px;font-size:14px;color:var(--muted)}.exercise-link>span:first-child{font-size:19px;color:#d3ddea}.exercise-link.result-2{border-color:#6a9b80;background:#1e3029;color:#b8d8c4}.exercise-link.result-1{border-color:#847294;background:#2c2835;color:#d5c4e5}.exercise-link:hover{border-color:#abc5e6}
+.course-reset{padding-top:32px}.course-reset>p{margin-bottom:16px;max-width:580px}.course-reset .reset-confirm{background:#46302e;border-color:#bb807b;color:#f2c6c2}.course-reset [role=status]:empty{display:none}.course-reset [role=status]{margin:18px 0;color:var(--green)}
+.series-finished{padding:32px;max-width:800px}.series-finished h2{font-size:28px}.series-finished p{margin:16px 0 26px;color:var(--muted)}
+@media(max-width:600px){.lesson-position{margin-top:-10px;gap:10px;font-size:14px}.lesson-position a{font-size:14px}.course-topic>summary{align-items:flex-start;flex-direction:column;gap:7px}.course-topic>summary>span:last-child{width:100%;justify-content:space-between}.progress-key{font-size:14px}.series-finished{padding:24px}.exercise-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}}
+
+.study-file-button:focus-within{outline:2px solid #a7c8ed;outline-offset:4px}
+@media(pointer:coarse){.cleaned-shell input,.cleaned-shell select,.cleaned-shell textarea{font-size:16px}}
+.cleaned-shell .trainer-control-grid{grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr))}
+.cleaned-shell .trainer-control-grid label,.cleaned-shell .trainer-control-grid select{min-width:0;max-width:100%}
+.cleaned-shell .trainer-control-grid label>span{overflow-wrap:anywhere}

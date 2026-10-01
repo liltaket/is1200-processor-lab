@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ModeProps } from '../ui-types';
 import type { Topic } from '../engine';
+import { useLesson } from '../course';
 
 export type Grade = {
   correct: boolean;
@@ -12,6 +13,7 @@ export type Grade = {
 };
 
 export function useCheck(topic: Topic, onAttempt: ModeProps['onAttempt']) {
+  const lesson = useLesson(topic);
   const [grade, setGrade] = useState<Grade | null>(null);
   const [locked, setLocked] = useState(false);
   const [assisted, setAssisted] = useState(false);
@@ -20,6 +22,7 @@ export function useCheck(topic: Topic, onAttempt: ModeProps['onAttempt']) {
     if (locked) return;
     const counted = !assisted;
     if (counted) onAttempt(topic, correct);
+    lesson.complete(correct && counted ? 'solved' : 'reviewed');
     setGrade({ correct, expected, explanation, component, counted });
     setLocked(true);
     if (!correct) setAssisted(true);
@@ -27,6 +30,7 @@ export function useCheck(topic: Topic, onAttempt: ModeProps['onAttempt']) {
 
   function reveal(expected: string, explanation: string, component: string) {
     if (locked) return;
+    lesson.complete('reviewed');
     setGrade({ correct: false, expected, explanation, component, revealed: true, counted: false });
     setLocked(true);
     setAssisted(true);

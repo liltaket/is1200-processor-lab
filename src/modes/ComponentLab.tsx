@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { ArrowRight, Eye, RotateCcw, Sparkles, Zap } from 'lucide-react';
+import { ArrowRight, Eye, RotateCcw, Zap } from 'lucide-react';
 import type { ModeProps } from '../ui-types';
+import { lessonRandom, useLesson } from '../course';
+import { NumberAnswer } from '../components/NumberAnswer';
 import {
   ALU_FUNCTIONS,
   INSTRUCTIONS,
@@ -9,6 +11,7 @@ import {
   decode,
   formatValue,
   generateScenario,
+  instructionText,
   parseValue,
   readRegister,
   toSigned,
@@ -60,17 +63,29 @@ interface RegisterQuestion {
   after: number[];
 }
 
-function createRegisterQuestion(): RegisterQuestion {
+const REGISTER_LESSON_PLAN: { address: number; enable: boolean }[] = [
+  { address: 0, enable: true },
+  { address: 5, enable: false },
+  { address: 5, enable: true },
+  { address: 6, enable: true },
+  { address: 7, enable: true },
+  { address: 1, enable: true },
+  { address: 2, enable: true },
+  { address: 3, enable: true },
+  { address: 4, enable: true },
+];
+
+function createRegisterQuestion(index: number, rng: () => number): RegisterQuestion {
   const before = [...seedRegisters];
-  const address = Math.floor(Math.random() * 8);
-  const enable = Math.random() >= 0.25;
+  const { address, enable } = REGISTER_LESSON_PLAN[Math.min(index, REGISTER_LESSON_PLAN.length - 1)];
   const current = readRegister(before, address);
-  const data = toUnsigned((toSigned(current) + 31 + Math.floor(Math.random() * 25)) | 0);
+  const data = toUnsigned((toSigned(current) + 1 + Math.floor(rng() * 24)) | 0);
   const after = writeRegister(before, address, data, enable);
   return { before, address, data, enable, after, outcome: !enable ? 'disabled' : address === 0 ? 'x0' : 'write' };
 }
 
 function RegisterFileLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
+  const lesson = useLesson('registers');
   const [registers, setRegisters] = useState<number[]>(() => [...seedRegisters]);
   const [a1, setA1] = useState(5);
   const [a2, setA2] = useState(6);
@@ -80,7 +95,7 @@ function RegisterFileLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   const [cycles, setCycles] = useState(0);
   const [base, setBase] = useState<'decimal' | 'hex' | 'binary'>('decimal');
   const [edgeNote, setEdgeNote] = useState('');
-  const [question, setQuestion] = useState(createRegisterQuestion);
+  const [question] = useState(() => createRegisterQuestion(lesson.index, lessonRandom('registers', lesson.index)));
   const [prediction, setPrediction] = useState('');
   const check = useCheck('registers', onAttempt);
   const wd = parseBitPattern(wdText);
@@ -120,10 +135,6 @@ function RegisterFileLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     check.reset();
   }
 
-  function newQuestion() {
-    setQuestion(createRegisterQuestion()); setPrediction(''); check.fresh();
-  }
-
   function submitPrediction() {
     if (!prediction || check.locked) return;
     const labels = Object.fromEntries(predictionOptions.map(({ value, label }) => [value, label]));
@@ -139,9 +150,19 @@ function RegisterFileLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     <div className="trainer-stack">
       <section className="panel trainer-panel">
         <div className="trainer-heading-row">
-          <div><h2 className="section-title">Read registers and tick a write</h2></div>
+          <div><h2 className="section-title">Predict the register-file write</h2></div>
           <BaseDisplay value={base} onChange={setBase} />
         </div>
+        <div className="trainer-observed-output" aria-label="Register write inputs"><span>A3</span><strong>x{question.address}</strong><span>WD3</span><strong className="mono">{formatValue(question.data, base)}</strong><span>WE3</span><strong>{question.enable ? '1 · enabled' : '0 · disabled'}</strong><span>Before</span><strong className="mono">{formatValue(readRegister(question.before, question.address), base)}</strong></div>
+        <form onSubmit={(event) => { event.preventDefault(); submitPrediction(); }}>
+          <label className="field trainer-field-label trainer-prediction-answer"><span>What changes after the rising edge?</span><select className="trainer-control" value={prediction} onChange={(event) => setPrediction(event.target.value)} disabled={check.locked}><option value="">Choose an outcome</option>{predictionOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <div className="trainer-actions"><button className="button button-primary" type="submit" disabled={!prediction || check.locked}>Check answer</button><button className="button button-secondary" type="button" onClick={revealPrediction} disabled={check.locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" type="button" onClick={resetQuestion}><RotateCcw size={15} /> Reset answer</button></div>
+          <Feedback grade={check.grade} />
+        </form>
+      </section>
+
+      <details className="trainer-extra"><summary>Experiment with registers</summary><section className="panel trainer-panel">
+        <div className="trainer-heading-row"><div><h2 className="section-title">Read registers and tick a write</h2><p className="muted">Reads update immediately; A3 writes only on the rising edge.</p></div></div>
         <div className="trainer-register-layout">
           <div className="trainer-experiment">
             <div className="trainer-form-grid trainer-register-addresses">
@@ -167,60 +188,57 @@ function RegisterFileLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
             <button className="button button-secondary trainer-reset-experiment" onClick={resetExperiment}><RotateCcw size={15} /> Reset register file</button>
           </div>
         </div>
-      </section>
-
-      <details className="trainer-extra"><summary>Practice a write</summary><section className="panel trainer-panel trainer-predictor">
-        <div className="trainer-heading-row"><div><h2 className="section-title">Predict the next rising edge</h2><p className="muted">This exercise uses the values shown below.</p></div><button className="button button-secondary" onClick={newQuestion}><Sparkles size={15} /> New question</button></div>
-        <div className="trainer-prediction-signals"><span>A3 <strong>x{question.address}</strong></span><span>WD3 <strong className="mono">{formatValue(question.data, base)}</strong></span><span>WE3 <strong>{question.enable ? '1 · enabled' : '0 · disabled'}</strong></span><span>Before <strong className="mono">{formatValue(readRegister(question.before, question.address), base)}</strong></span></div>
-        <label className="field trainer-field-label trainer-prediction-answer"><span>What does the next rising edge do?</span><select className="trainer-control" value={prediction} onChange={(event) => setPrediction(event.target.value)} disabled={check.locked}><option value="">Choose the register-file outcome</option>{predictionOptions.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <div className="trainer-actions"><button className="button button-primary" onClick={submitPrediction} disabled={!prediction || check.locked}>Check prediction</button><button className="button button-secondary" onClick={revealPrediction} disabled={check.locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" onClick={resetQuestion}><RotateCcw size={15} /> Reset answer</button></div>
-        <Feedback grade={check.grade} />
       </section></details>
     </div>
   );
 }
 
-const DEFAULT_A = '2147483647';
-const DEFAULT_B = '1';
-const DEFAULT_FUNCTION: ALUFunction = '000';
+type AluQuestion = { a: number; b: number; functionCode: ALUFunction };
+
+const ALU_LESSON_CASES: AluQuestion[] = [
+  { a: 0x7fff_ffff, b: 1, functionCode: '000' },
+  { a: 0xffff_ffff, b: 1, functionCode: '000' },
+  { a: 0x8000_0000, b: 1, functionCode: '001' },
+  { a: toUnsigned(-9), b: toUnsigned(-9), functionCode: '001' },
+  { a: 0xf0f0_a5a5, b: 0x0ff0_0ff0, functionCode: '010' },
+  { a: 0xf0f0_a5a5, b: 0x0ff0_0ff0, functionCode: '011' },
+  { a: toUnsigned(-1), b: 1, functionCode: '101' },
+  { a: 0x8000_0000, b: 0x7fff_ffff, functionCode: '101' },
+  { a: 0x7fff_ffff, b: 0x8000_0000, functionCode: '101' },
+];
+
+function createAluQuestion(index: number, rng: () => number): AluQuestion {
+  if (index < ALU_LESSON_CASES.length) return ALU_LESSON_CASES[index];
+  const signedOperand = () => Math.floor(rng() * 257) - 128;
+  return { a: toUnsigned(signedOperand()), b: toUnsigned(signedOperand()), functionCode: '000' };
+}
 
 function AluLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [aText, setAText] = useState(DEFAULT_A);
-  const [bText, setBText] = useState(DEFAULT_B);
-  const [functionCode, setFunctionCode] = useState<ALUFunction>(DEFAULT_FUNCTION);
+  const lesson = useLesson('alu');
+  const [question] = useState(() => createAluQuestion(lesson.index, lessonRandom('alu', lesson.index)));
   const [base, setBase] = useState<'decimal' | 'hex' | 'binary'>('decimal');
   const [predictedY, setPredictedY] = useState('');
   const [predictedZero, setPredictedZero] = useState('');
   const check = useCheck('alu', onAttempt);
-  const parsedA = parseBitPattern(aText);
-  const parsedB = parseBitPattern(bText);
-  const result = parsedA === null || parsedB === null ? null : alu(parsedA, parsedB, functionCode);
+  const { a, b, functionCode } = question;
+  const result = alu(a, b, functionCode);
   const logicalDontCare = functionCode === '010' || functionCode === '011' || functionCode === '101';
   const subtraction = functionCode === '001';
   const functionName = ALU_FUNCTIONS.find(({ code }) => code === functionCode)?.name ?? functionCode;
   const predictionValue = parseBitPattern(predictedY);
 
   function resetQuestion() {
-    setAText(DEFAULT_A); setBText(DEFAULT_B); setFunctionCode(DEFAULT_FUNCTION); setPredictedY(''); setPredictedZero(''); check.reset();
-  }
-
-  function newQuestion() {
-    const nextA = toUnsigned(Math.floor(Math.random() * 65) - 32);
-    const nextB = toUnsigned(Math.floor(Math.random() * 65) - 32);
-    const nextFunction = ALU_FUNCTIONS[Math.floor(Math.random() * ALU_FUNCTIONS.length)].code;
-    setAText(String(toSigned(nextA))); setBText(String(toSigned(nextB))); setFunctionCode(nextFunction);
-    setPredictedY(''); setPredictedZero(''); check.fresh();
+    setPredictedY(''); setPredictedZero(''); check.reset();
   }
 
   function expectedText() {
-    if (!result) return 'Enter valid 32-bit A and B values.';
     return logicalDontCare
-      ? `Y = ${formatValue(result.y, base)}. Zero is don't-care for ${functionName}; the reference model reports ${result.zero}.`
+      ? `Y = ${formatValue(result.y, base)}. Zero is not scored for ${functionName}; the reference model reports ${result.zero}.`
       : `Y = ${formatValue(result.y, base)} and Zero = ${result.zero}.`;
   }
 
   function explanation() {
-    if (functionCode === '101') return `SLT compares signed A (${parsedA === null ? '?' : toSigned(parsedA)}) with signed B (${parsedB === null ? '?' : toSigned(parsedB)}); Y is 1 exactly when A < B. Zero is a don't-care for SLT.`;
+    if (functionCode === '101') return `SLT compares signed A (${toSigned(a)}) with signed B (${toSigned(b)}); Y is 1 exactly when A < B. Zero is a don't-care for SLT.`;
     if (functionCode === '010') return "AND forms Y by taking the bitwise AND of A and B. Zero is a don't-care for AND under the Lab 4 contract.";
     if (functionCode === '011') return "OR forms Y by taking the bitwise OR of A and B. Zero is a don't-care for OR under the Lab 4 contract.";
     if (subtraction) return 'SUB computes A + (~B) + 1. The control signal inverts every B bit through XOR and supplies carry-in 1; Zero is asserted when the 32-bit result is zero.';
@@ -228,14 +246,15 @@ function AluLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   }
 
   function submit() {
-    if (!result || predictionValue === null || check.locked) return;
+    if (predictionValue === null || check.locked) return;
     const zeroMatches = logicalDontCare || predictedZero === String(result.zero);
     const outputNote = `Your Y ${predictionValue === result.y ? 'matches' : 'does not match'} the ALU result${logicalDontCare ? '.' : `; your Zero ${predictedZero === String(result.zero) ? 'matches' : 'does not match'} the arithmetic Zero output.`}`;
     check.check(predictionValue === result.y && zeroMatches, expectedText(), `${outputNote} ${explanation()}`, 'ALU · operation, 32-bit result and Zero output');
   }
 
   function reveal() {
-    if (!result) return;
+    setPredictedY(String(toSigned(result.y)));
+    if (!logicalDontCare) setPredictedZero(String(result.zero));
     check.reveal(expectedText(), explanation(), 'ALU · operation, 32-bit result and Zero output');
   }
 
@@ -245,32 +264,29 @@ function AluLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   return (
     <div className="trainer-stack">
       <section className="panel trainer-panel">
-        <div className="trainer-heading-row"><div><h2 className="section-title">Calculate Y and Zero</h2></div><BaseDisplay value={base} onChange={setBase} /></div>
-        <div className="trainer-form-grid trainer-alu-controls">
-          <label className="field trainer-field-label"><span>A · 32-bit operand</span><input className="trainer-control mono" value={aText} onChange={(event) => setAText(event.target.value)} aria-invalid={parsedA === null} disabled={check.locked} /></label>
-          <label className="field trainer-field-label"><span>B · 32-bit operand</span><input className="trainer-control mono" value={bText} onChange={(event) => setBText(event.target.value)} aria-invalid={parsedB === null} disabled={check.locked} /></label>
-          <label className="field trainer-field-label"><span>F · ALU function</span><select className="trainer-control" value={functionCode} onChange={(event) => setFunctionCode(event.target.value as ALUFunction)} disabled={check.locked}>{ALU_FUNCTIONS.map(({ code, name }) => <option key={code} value={code}>{code} · {name}</option>)}</select></label>
-        </div>
-        {(parsedA === null || parsedB === null) && <p className="trainer-inline-note is-error" role="status">Enter 32-bit values for A and B: decimal, 0x hexadecimal, or 0b binary.</p>}
-        <div className="trainer-form-grid trainer-prediction-controls">
-          <label className="field trainer-field-label"><span>Predicted Y</span><input className="trainer-control mono" value={predictedY} onChange={(event) => setPredictedY(event.target.value)} placeholder={base === 'hex' ? '0x…' : base === 'binary' ? '0b…' : 'signed decimal'} disabled={check.locked} /></label>
-          <label className="field trainer-field-label"><span>Predicted Zero {logicalDontCare ? '· don’t-care' : ''}</span><select className="trainer-control" value={predictedZero} onChange={(event) => setPredictedZero(event.target.value)} disabled={check.locked || logicalDontCare}><option value="">{logicalDontCare ? 'Not scored for this F' : 'Choose 0 or 1'}</option><option value="0">0 · not zero</option><option value="1">1 · zero</option></select></label>
-        </div>
-        <div className="trainer-actions"><button className="button button-primary" onClick={submit} disabled={predictionValue === null || (!logicalDontCare && !predictedZero) || !result || check.locked}>Check outputs</button><button className="button button-secondary" onClick={reveal} disabled={!result || check.locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" onClick={resetQuestion}><RotateCcw size={15} /> Reset question</button><button className="button button-secondary" onClick={newQuestion}><Sparkles size={15} /> New values</button></div>
+        <div className="trainer-heading-row"><div><h2 className="section-title">Predict the ALU result</h2></div><BaseDisplay value={base} onChange={setBase} /></div>
+        <div className="trainer-observed-output" aria-label="ALU inputs"><span>A</span><strong className="mono">{formatValue(a, base)}</strong><span>B</span><strong className="mono">{formatValue(b, base)}</strong><span>F</span><strong>{functionCode} · {functionName}</strong></div>
+        <form onSubmit={(event) => { event.preventDefault(); submit(); }}>
+          <div className="trainer-form-grid trainer-prediction-controls">
+            <NumberAnswer label="Predicted Y · 32-bit result" value={predictedY} onChange={setPredictedY} expected={result.y} disabled={check.locked} />
+            <label className="field trainer-field-label"><span>Predicted Zero {logicalDontCare ? '· don’t-care' : ''}</span><select className="trainer-control" value={predictedZero} onChange={(event) => setPredictedZero(event.target.value)} disabled={check.locked || logicalDontCare}><option value="">{logicalDontCare ? 'Not scored for this operation' : 'Choose 0 or 1'}</option><option value="0">0 · nonzero result</option><option value="1">1 · zero result</option></select></label>
+          </div>
+          <div className="trainer-actions"><button className="button button-primary" type="submit" disabled={predictionValue === null || (!logicalDontCare && !predictedZero) || check.locked}>Check answer</button><button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" type="button" onClick={resetQuestion}><RotateCcw size={15} /> Reset answer</button></div>
+        </form>
         {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
         <Feedback grade={check.grade} />
         <details className="trainer-extra"><summary>See the operation</summary>        <div className="trainer-alu-path" role="img" aria-label={subtraction ? 'Subtraction path: A plus B inverted by XOR control 1 plus carry-in 1.' : `Selected ALU operation: ${functionName}.`}>
           {functionCode === '000' || subtraction ? <>
-            <div className="trainer-alu-node"><span>A</span><strong className="mono">{parsedA === null ? 'invalid' : formatValue(parsedA, base)}</strong></div>
+            <div className="trainer-alu-node"><span>A</span><strong className="mono">{formatValue(a, base)}</strong></div>
             <span className="trainer-path-symbol">+</span>
-            <div className="trainer-alu-node"><span>B</span><strong className="mono">{parsedB === null ? 'invalid' : formatValue(parsedB, base)}</strong></div>
+            <div className="trainer-alu-node"><span>B</span><strong className="mono">{formatValue(b, base)}</strong></div>
             <span className="trainer-path-arrow">→</span>
             <div className={`trainer-xor-node ${subtraction ? 'is-active' : ''}`}><span>B XOR {`{32{${xorControl}}}`}</span><strong>{subtraction ? '~B' : 'B passes through'}</strong></div>
             <span className="trainer-path-symbol">+</span>
             <div className="trainer-carry-node"><span>Carry-in</span><strong>{carryIn}</strong></div>
             <span className="trainer-path-arrow">→</span>
             <div className="trainer-alu-node trainer-alu-output"><span>Y</span><strong className="mono">{check.grade && result ? formatValue(result.y, base) : '?'}</strong></div>
-          </> : <div className="trainer-logic-path"><strong>{functionName}</strong><span>{functionCode === '101' ? check.grade && parsedA !== null && parsedB !== null ? `Signed comparison: ${toSigned(parsedA)} < ${toSigned(parsedB)} → Y=${result?.y}.` : 'SLT compares A and B as signed 32-bit integers. Predict whether A is less than B.' : 'The selected bitwise function operates on all 32 bits.'}</span><span className="trainer-path-arrow">→</span><strong>Y = {check.grade && result ? formatValue(result.y, base) : '?'}</strong></div>}
+          </> : <div className="trainer-logic-path"><strong>{functionName}</strong><span>{functionCode === '101' ? check.grade ? `Signed comparison: ${toSigned(a)} < ${toSigned(b)} → Y=${result.y}.` : 'SLT compares A and B as signed 32-bit integers. Predict whether A is less than B.' : 'The selected bitwise function operates on all 32 bits.'}</span><span className="trainer-path-arrow">→</span><strong>Y = {check.grade ? formatValue(result.y, base) : '?'}</strong></div>}
         </div>
         <p className="trainer-inline-note">{subtraction ? 'For SUB, XOR control=1 flips each B bit and carry-in=1 completes two’s-complement subtraction.' : functionCode === '000' ? 'For ADD, XOR control=0 leaves B unchanged and carry-in=0.' : 'AND, OR and signed SLT use their selected logic/comparison path. Zero is a don’t-care for these three functions in the Lab 4 ALU contract.'}</p>
 </details>
@@ -281,10 +297,10 @@ function AluLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
 
 interface ControlCase { scenario: Scenario; name: 'add' | 'addi' | 'beq'; signals: ControlSignals; decodedOpcode: number; funct3: number; }
 
-function createControlCase(exclude?: string): ControlCase {
-  const names = (['add', 'addi', 'beq'] as const).filter((name) => name !== exclude);
-  const name = names[Math.floor(Math.random() * names.length)] ?? 'add';
-  const scenario = generateScenario(name);
+function createControlCase(index: number, rng: () => number): ControlCase {
+  const names = ['add', 'addi', 'beq'] as const;
+  const name = names[Math.max(0, index) % names.length];
+  const scenario = generateScenario(name, rng);
   const decoded = decode(scenario.word, 'lab');
   const trace = traceCycle(scenario.state, scenario.word);
   return { scenario, name, signals: trace.control, decodedOpcode: decoded.opcode, funct3: decoded.funct3 };
@@ -294,7 +310,8 @@ type ControlAnswer = { opcode: string; regWrite: string; aluSrc: string; branch:
 const blankControl: ControlAnswer = { opcode: '', regWrite: '', aluSrc: '', branch: '', aluControl: '' };
 
 function ControlLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [example, setExample] = useState(() => createControlCase());
+  const lesson = useLesson('control');
+  const [example] = useState(() => createControlCase(lesson.index, lessonRandom('control', lesson.index)));
   const [answer, setAnswer] = useState<ControlAnswer>(blankControl);
   const check = useCheck('control', onAttempt);
   const expectedOpcode = formatValue(example.decodedOpcode, 'hex');
@@ -326,10 +343,6 @@ function ControlLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     check.reset();
   }
 
-  function newQuestion() {
-    setExample(createControlCase(example.name)); setAnswer(blankControl); check.fresh();
-  }
-
   const opcodeOptions = (['add', 'addi', 'beq'] as const).map((name) => ({ value: formatValue(INSTRUCTIONS[name].opcode, 'hex'), label: `${formatValue(INSTRUCTIONS[name].opcode, 'hex')} · ${name}` }));
   const controlRows: { key: keyof ControlAnswer; title: string; component: string; help: string }[] = [
     { key: 'opcode', title: 'Encoded opcode', component: 'Instruction bits', help: 'A field in the 32-bit word; this is not generated by the control unit.' },
@@ -342,19 +355,21 @@ function ControlLab({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   return (
     <div className="trainer-stack">
       <section className="panel trainer-panel">
-        <div className="trainer-heading-row"><div><h2 className="section-title">Set the control signals</h2></div><button className="button button-secondary" onClick={newQuestion}><Sparkles size={15} /> New instruction</button></div>
-        <div className="trainer-instruction-sample"><span className="trainer-sample-mnemonic">{example.name}</span><code className="mono">{formatValue(example.scenario.word, 'hex')}</code><span>funct3 <strong className="mono">{example.funct3.toString(2).padStart(3, '0')}</strong></span></div>
+        <div className="trainer-heading-row"><div><h2 className="section-title">Set the control signals</h2></div></div>
+        <div className="trainer-instruction-sample"><span className="trainer-sample-mnemonic">{example.name}</span><code className="mono">{instructionText(example.scenario.instruction)}</code><span>funct3 <strong className="mono">{example.funct3.toString(2).padStart(3, '0')}</strong></span>{check.grade && <code className="mono">{formatValue(example.scenario.word, 'hex')}</code>}</div>
+        <form onSubmit={(event) => { event.preventDefault(); submit(); }}>
         <div className="trainer-control-grid">
           {controlRows.map((row) => <label className="field trainer-field-label" key={row.key}><span>{row.title}</span><select className="trainer-control" value={answer[row.key]} onChange={(event) => setField(row.key, event.target.value)} disabled={check.locked}><option value="">Select {row.title}</option>{row.key === 'opcode' ? opcodeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>) : row.key === 'aluControl' ? ALU_FUNCTIONS.map(({ code, name }) => <option key={code} value={code}>{code} · {name}</option>) : <><option value="0">{row.key === 'aluSrc' ? '0 · RD2' : row.key === 'regWrite' ? '0 · no write' : '0 · off'}</option><option value="1">{row.key === 'aluSrc' ? '1 · immediate' : row.key === 'regWrite' ? '1 · write' : '1 · enabled'}</option></>}</select></label>)}
         </div>
-        <div className="trainer-actions"><button className="button button-primary" onClick={submit} disabled={check.locked || Object.values(answer).some((value) => !value)}>Check controls</button><button className="button button-secondary" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal controls</button><button className="button button-secondary" onClick={resetQuestion}><RotateCcw size={15} /> Reset answers</button></div>
+        <div className="trainer-actions"><button className="button button-primary" type="submit" disabled={check.locked || Object.values(answer).some((value) => !value)}>Check answer</button><button className="button button-secondary" type="button" onClick={reveal} disabled={check.locked}><Eye size={15} /> Reveal answer</button><button className="button button-secondary" type="button" onClick={resetQuestion}><RotateCcw size={15} /> Reset answer</button></div>
         {check.assisted && !check.grade && <p className="trainer-inline-note">Practice · not scored</p>}
         <Feedback grade={check.grade} />
+        </form>
       </section>
       <details className="trainer-extra"><summary>How the decoder works</summary><section className="panel trainer-panel">
         <h2 className="section-title">Instruction fields are not control outputs</h2>
         <div className="trainer-compare-table">
-          <div><strong>Encoded instruction field</strong><span>opcode = {expectedOpcode}</span><span>funct3 = {example.funct3.toString(2).padStart(3, '0')}</span><small>Read from the 32-bit instruction word.</small></div>
+          <div><strong>Encoded instruction field</strong><span>opcode = {check.grade ? expectedOpcode : 'revealed after your answer'}</span><span>funct3 = {example.funct3.toString(2).padStart(3, '0')}</span><small>Read from the 32-bit instruction word.</small></div>
           <ArrowRight size={19} aria-hidden="true" />
           <div><strong>Generated ALU control</strong><span>ALUControl = {check.grade ? expected.aluControl : 'hidden until your check'}</span><small>Chosen by the decoder for the operation the ALU must perform.</small></div>
         </div>

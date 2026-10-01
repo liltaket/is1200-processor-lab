@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useLesson } from '../course';
+import { NumberAnswer } from '../components/NumberAnswer';
 import {
   CLOCK_EVENTS,
   ORAL_QUESTIONS,
@@ -17,14 +19,16 @@ import {
   toSigned,
   traceCycle,
 } from '../engine';
-import type { CpuState, CycleTrace, ProgramLine, Topic } from '../engine';
+import type { CpuState, CycleTrace, ProgramLine } from '../engine';
 import './study.css';
 
 export interface StudyLabProps extends ModeProps {
   topic: 'clock' | 'oral' | 'factorial';
 }
+type StudyLesson = ReturnType<typeof useLesson>;
 
 const MAX_RUN_CYCLES = 512;
+const FACTORIAL_INPUTS = [0, 3, 8] as const;
 
 type PredictionStep = {
   pc: number;
@@ -33,6 +37,11 @@ type PredictionStep = {
   t2: number;
 };
 type Prediction = { expected: number; after: number; trace: CycleTrace | null; history: PredictionStep[] };
+
+function sameProgram(left: ProgramLine[], right: ProgramLine[]): boolean {
+  return left.length === right.length && left.every((line, index) =>
+    line.address === right[index].address && line.word === right[index].word);
+}
 
 function makeAssemblyProgram(source: string): ProgramLine[] {
   const program = parseAssembly(source, 'lab');
@@ -120,25 +129,19 @@ function predict(program: ProgramLine[], state: CpuState, steps: number): Predic
   return { expected: toSigned(nextState.registers[7]), after: nextState.pc, trace: finalTrace, history };
 }
 
-function ClockMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [eventIndex, setEventIndex] = useState(() => Math.floor(Math.random() * CLOCK_EVENTS.length));
+function ClockMode({ onAttempt, lesson }: Pick<ModeProps, 'onAttempt'> & { lesson: StudyLesson }) {
   const [selected, setSelected] = useState<'combinational' | 'edge' | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const event = CLOCK_EVENTS[eventIndex];
+  const event = CLOCK_EVENTS[lesson.index];
   const correct = selected === event.answer;
-
-  function nextEvent() {
-    let next = eventIndex;
-    while (CLOCK_EVENTS.length > 1 && next === eventIndex) next = Math.floor(Math.random() * CLOCK_EVENTS.length);
-    setEventIndex(next);
-    setSelected(null);
-    setSubmitted(false);
-  }
 
   function submit() {
     if (!selected || submitted) return;
     setSubmitted(true);
-    onAttempt('clock', correct);
+    if (lesson.status !== 2) {
+      onAttempt('clock', correct);
+      lesson.complete(correct ? 'solved' : 'reviewed');
+    }
   }
 
   return (
@@ -147,10 +150,10 @@ function ClockMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
         <h2 className="section-title">When does the event happen?</h2>
         <p className="study-prompt">{event.event}</p>
         <div className="study-choice-row" role="group" aria-label="Choose when the event happens">
-          <button className={`button button-secondary study-choice ${selected === 'combinational' ? 'is-selected' : ''}`} disabled={submitted} onClick={() => setSelected('combinational')}>
+          <button className={`button button-secondary study-choice ${selected === 'combinational' ? 'is-selected' : ''}`} aria-pressed={selected === 'combinational'} disabled={submitted} onClick={() => setSelected('combinational')}>
             Immediate propagation
           </button>
-          <button className={`button button-secondary study-choice ${selected === 'edge' ? 'is-selected' : ''}`} disabled={submitted} onClick={() => setSelected('edge')}>
+          <button className={`button button-secondary study-choice ${selected === 'edge' ? 'is-selected' : ''}`} aria-pressed={selected === 'edge'} disabled={submitted} onClick={() => setSelected('edge')}>
             Rising clock edge
           </button>
         </div>
@@ -161,67 +164,42 @@ function ClockMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
           </div>
         )}
         <div className="study-actions">
-          {!submitted ? <button className="button button-primary" disabled={!selected} onClick={submit}>Check timing</button>
-            : <button className="button button-primary" onClick={nextEvent}>Next event</button>}
+          {!submitted && <button className="button button-primary" disabled={!selected} onClick={submit}>Check timing</button>}
         </div>
       </section>
     </div>
   );
 }
 
-function OralMode({ onAttempt }: Pick<StudyLabProps, 'onAttempt'>) {
-  const [scope, setScope] = useState<'lab' | 'lecture'>('lab');
-  const [topicFilter, setTopicFilter] = useState<Topic | 'all'>('all');
-  const [questionId, setQuestionId] = useState('');
+function OralMode({ onAttempt, lesson }: Pick<StudyLabProps, 'onAttempt'> & { lesson: StudyLesson }) {
   const [notes, setNotes] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [graded, setGraded] = useState(false);
-  const pool = useMemo(() => ORAL_QUESTIONS.filter((question) => question.scope === scope
-    && (topicFilter === 'all' || question.topic === topicFilter)), [scope, topicFilter]);
-  const question = pool.find(({ id }) => id === questionId) ?? pool[0];
-
-  function chooseNext() {
-    if (pool.length < 1) return;
-    const choices = pool.filter(({ id }) => id !== question?.id);
-    const next = (choices.length ? choices : pool)[Math.floor(Math.random() * (choices.length || pool.length))];
-    setQuestionId(next.id);
-    setNotes('');
-    setRevealed(false);
-    setGraded(false);
-  }
-
-  function switchFilter(change: () => void) {
-    change();
-    setQuestionId('');
-    setNotes('');
-    setRevealed(false);
-    setGraded(false);
-  }
+  const question = ORAL_QUESTIONS[lesson.index];
+  const scopeLabel = question.scope === 'lab' ? 'Lab 4' : 'Lecture 9 extension';
 
   function selfGrade(understood: boolean) {
     if (!question || graded) return;
     setGraded(true);
-    onAttempt(question.topic, understood);
+    if (lesson.status !== 2) {
+      onAttempt(question.topic, understood);
+      lesson.complete(understood ? 'solved' : 'reviewed');
+    }
   }
 
   return (
     <div className="study-stack">
       <section className="panel study-panel">
         <div className="study-toolbar">
-          <label className="field study-select-wrap">Scope
-            <select className="study-select" value={scope} onChange={(event) => switchFilter(() => setScope(event.target.value as 'lab' | 'lecture'))}>
-              <option value="lab">Lab 4</option><option value="lecture">Lecture 9 extension</option>
-            </select>
-          </label>
-          <label className="field study-select-wrap">Topic
-            <select className="study-select" value={topicFilter} onChange={(event) => switchFilter(() => setTopicFilter(event.target.value as Topic | 'all'))}>
-              <option value="all">All topics</option>
-              {Array.from(new Set(ORAL_QUESTIONS.filter((item) => item.scope === scope).map((item) => item.topic))).map((item) => (
-                <option value={item} key={item}>{item[0].toUpperCase() + item.slice(1)}</option>
+          <span className="chip">{scopeLabel}</span>
+          <details className="study-example-details">
+            <summary>Choose question</summary>
+            <select aria-label="Choose oral question" className="study-select" value={lesson.index} onChange={(event) => lesson.goTo(Number(event.target.value))}>
+              {ORAL_QUESTIONS.map((item, index) => (
+                <option value={index} key={item.id}>{item.scope === 'lab' ? 'Lab 4' : 'Lecture 9'} · {item.prompt}</option>
               ))}
             </select>
-          </label>
-          <button className="button button-secondary study-new" onClick={chooseNext} disabled={pool.length < 2}>Next question</button>
+          </details>
         </div>
         {question ? <>
           <h2 className="study-prompt">{question.prompt}</h2>
@@ -240,17 +218,17 @@ function OralMode({ onAttempt }: Pick<StudyLabProps, 'onAttempt'>) {
               <button className="button button-secondary" onClick={() => selfGrade(false)} disabled={graded}>Needs review</button>
               <button className="button button-primary" onClick={() => selfGrade(true)} disabled={graded}>Understood</button>
             </div>}
-        </> : <p className="muted">No questions for this scope and topic.</p>}
+        </> : <p className="muted">No question at this lesson position.</p>}
       </section>
     </div>
   );
 }
 
-function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
-  const [inputN, setInputN] = useState(0);
-  const [source, setSource] = useState(() => factorialSource(0));
-  const [program, setProgram] = useState<ProgramLine[]>(() => makeAssemblyProgram(factorialSource(0)));
-  const [state, setState] = useState<CpuState>(() => initialProgram(0).state);
+function FactorialMode({ onAttempt, lesson }: Pick<ModeProps, 'onAttempt'> & { lesson: StudyLesson }) {
+  const lessonN = FACTORIAL_INPUTS[lesson.index] ?? FACTORIAL_INPUTS[0];
+  const [source, setSource] = useState(() => factorialSource(lessonN));
+  const [program, setProgram] = useState<ProgramLine[]>(() => makeAssemblyProgram(factorialSource(lessonN)));
+  const [state, setState] = useState<CpuState>(() => initialProgram(lessonN).state);
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [lastTrace, setLastTrace] = useState<CycleTrace | null>(null);
@@ -260,13 +238,22 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
   const [predictionResult, setPredictionResult] = useState<Prediction | null>(null);
   const [halted, setHalted] = useState(false);
   const [sourceDirty, setSourceDirty] = useState(false);
+  const [isAuthoredExample, setIsAuthoredExample] = useState(true);
   const [assistedPredictionKey, setAssistedPredictionKey] = useState<string | null>(null);
+  const courseAssisted = useRef(false);
   const [scoredPredictionKey, setScoredPredictionKey] = useState<string | null>(null);
   const currentLine = program.find(({ address }) => address === state.pc);
   const currentRomIndex = state.pc >>> 2;
   const predictionKey = `${state.cycles}:${state.pc}:${predictionSteps}:${program.map(({ address, word }) => `${address}-${word}`).join(',')}`;
+  const expectedPrediction = useMemo(() => {
+    try { return predict(program, state, predictionSteps).expected; }
+    catch { return null; }
+  }, [program, state, predictionSteps]);
+  const exactSharedExample = isAuthoredExample && !sourceDirty
+    && source === factorialSource(lessonN)
+    && sameProgram(program, makeAssemblyProgram(factorialSource(lessonN)));
 
-  function commitLoaded(nextSource: string, nextProgram: ProgramLine[], detail: string) {
+  function commitLoaded(nextSource: string, nextProgram: ProgramLine[], detail: string, authoredExample: boolean) {
     const memory = Object.fromEntries(nextProgram.map((line) => [line.address, line.word]));
     setProgram(nextProgram);
     setSource(nextSource);
@@ -277,18 +264,18 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
     setPredictionInput('');
     setHalted(false);
     setSourceDirty(false);
+    setIsAuthoredExample(authoredExample);
     setAssistedPredictionKey(null);
     setScoredPredictionKey(null);
     setIsError(false);
     setMessage(detail);
   }
 
-  function loadExample(nextN = inputN) {
+  function loadExample(nextN = lessonN) {
     try {
       const nextSource = factorialSource(nextN);
       const nextProgram = makeAssemblyProgram(nextSource);
-      setInputN(nextN);
-      commitLoaded(nextSource, nextProgram, `Authored demonstration loaded for n=${nextN}. This is an example program, not a course-provided canonical listing.`);
+      commitLoaded(nextSource, nextProgram, `Example loaded for n=${nextN}.`, true);
     } catch (error) {
       setIsError(true);
       setMessage(error instanceof Error ? error.message : String(error));
@@ -302,7 +289,7 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       const isHex = isHexText(text, file.name);
       const nextProgram = isHex ? makeHexProgram(text) : makeAssemblyProgram(text);
       const visibleSource = isHex ? nextProgram.map(({ source: line }) => line).join('\n') : text;
-      commitLoaded(visibleSource, nextProgram, `${file.name} loaded and validated in Lab 4 mode.`);
+      commitLoaded(visibleSource, nextProgram, `${file.name} loaded.`, false);
     } catch (error) {
       setIsError(true);
       setMessage(`File was not loaded: ${error instanceof Error ? error.message : String(error)}`);
@@ -330,6 +317,7 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       setChanged(changedRegisters);
       setState(next);
       setHalted(stopSelfLoop);
+      if (stopSelfLoop && exactSharedExample && lesson.status === 0) lesson.complete('reviewed');
       setIsError(false);
       setMessage(stopSelfLoop
         ? `Stop loop reached after ${next.cycles} clock cycles. t2 = ${toSigned(next.registers[7])}.`
@@ -372,6 +360,7 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       setMessage(stopped
         ? `Stop loop reached after ${working.cycles} total clock cycles. t2 = ${toSigned(working.registers[7])}.`
         : `Stopped after ${MAX_RUN_CYCLES} instructions without finding a self-branching stop loop.`);
+      if (stopped && exactSharedExample && lesson.status === 0) lesson.complete('reviewed');
     } catch (error) {
       setIsError(true);
       setMessage(`Run stopped before changing the visible state: ${error instanceof Error ? error.message : String(error)}`);
@@ -391,8 +380,14 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       const correct = entered === result.expected;
       const alreadyScored = scoredPredictionKey === predictionKey;
       const assisted = assistedPredictionKey === predictionKey;
-      if (!alreadyScored) {
-        if (!assisted) onAttempt('factorial', correct);
+      if (!correct || assisted) courseAssisted.current = true;
+      if (!alreadyScored && lesson.status !== 2) {
+        if (!assisted) {
+          onAttempt('factorial', correct);
+          if (exactSharedExample) lesson.complete(correct && !courseAssisted.current ? 'solved' : 'reviewed');
+        }
+        setScoredPredictionKey(predictionKey);
+      } else if (!alreadyScored) {
         setScoredPredictionKey(predictionKey);
       }
       setIsError(!correct);
@@ -418,6 +413,8 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       setPredictionResult(result);
       setPredictionInput(String(result.expected));
       setAssistedPredictionKey(predictionKey);
+      courseAssisted.current = true;
+      if (exactSharedExample) lesson.complete('reviewed');
     } catch (error) {
       setPredictionResult(null);
       setIsError(true);
@@ -448,13 +445,14 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
       <section className="panel study-panel">
         <div className="study-toolbar study-factorial-toolbar">
           <label className="field study-select-wrap">Example input n
-            <select className="study-select" value={inputN} onChange={(event) => loadExample(Number(event.target.value))}>
-              {[0, 3, 8].map((value) => <option value={value} key={value}>{value}</option>)}
+            <select className="study-select" value={lesson.index} onChange={(event) => lesson.goTo(Number(event.target.value))}>
+              {FACTORIAL_INPUTS.map((value, index) => <option value={index} key={value}>{value}</option>)}
             </select>
           </label>
           <details className="study-example-details">
             <summary>Example program</summary>
-            <p>This authored sample uses repeated addition. It is provided as a demonstration, not as a canonical course solution.</p>
+            <p>This sample uses repeated addition; it is an authored example, not the course’s canonical program.</p>
+            <button className="button button-secondary" onClick={() => loadExample()}>Load example</button>
           </details>
         </div>
         <div className="study-cpu-column">
@@ -497,7 +495,7 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
           <div className="study-disclosure-body">
             <p>Only <code>add</code>, <code>addi</code>, <code>beq</code> and x0–x7 are accepted.</p>
             <label className="field study-notes-label" htmlFor="factorial-source">Assembly source</label>
-            <textarea id="factorial-source" className="study-textarea study-code-area mono" value={source} onChange={(event) => { setSource(event.target.value); setSourceDirty(true); }} rows={12} spellCheck={false} />
+            <textarea id="factorial-source" className="study-textarea study-code-area mono" value={source} onChange={(event) => { setSource(event.target.value); setSourceDirty(true); setIsAuthoredExample(false); }} rows={12} spellCheck={false} />
             <div className="study-actions study-program-actions">
               <button className="button button-primary" onClick={() => {
                 try {
@@ -525,30 +523,32 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
               {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => <option value={value} key={value}>{value}</option>)}
             </select>
           </label>
-          <div className="study-prediction-controls">
-            <label className="field study-prediction-value">Predicted t2
-              <input className="study-input mono" value={predictionInput} onChange={(event) => setPredictionInput(event.target.value)} inputMode="numeric" />
-            </label>
-            <button className="button button-primary" onClick={checkPrediction} disabled={sourceDirty}>Check</button>
-            <button className="button button-secondary" onClick={predictValue} disabled={sourceDirty}>Show value</button>
-          </div>
+          <form className="study-prediction-controls" onSubmit={(event) => { event.preventDefault(); checkPrediction(); }}>
+            <NumberAnswer label="Predicted t2" value={predictionInput} onChange={setPredictionInput}
+              expected={expectedPrediction ?? 0} disabled={sourceDirty || expectedPrediction === null || lesson.status === 2} />
+            <button className="button button-primary" type="submit" disabled={sourceDirty || expectedPrediction === null || lesson.status === 2}>Check</button>
+          </form>
+          <details className="study-source-details">
+            <summary>Reveal answer</summary>
+            <button className="button button-secondary" onClick={predictValue} disabled={sourceDirty || expectedPrediction === null}>Show value and trace</button>
+          </details>
           {predictionResult && <div className="study-prediction-detail">
             <span>t2 = <strong className="mono">{predictionResult.expected}</strong></span>
             <span>PC after edges = <strong className="mono">{formatValue(predictionResult.after, 'hex')}</strong></span>
             <div className="study-prediction-history-wrap">
-              <table className="study-prediction-history">
-                <caption>State after each rising edge</caption>
-                <thead><tr><th scope="col">Edge</th><th scope="col">PC</th><th scope="col">Instruction</th><th scope="col">Register write</th><th scope="col">t2 after edge</th></tr></thead>
-                <tbody>{predictionResult.history.map((step, index) => (
-                  <tr key={`${step.pc}-${index}`}>
-                    <th scope="row">{index + 1}</th>
-                    <td className="mono">{formatValue(step.pc, 'hex')}</td>
-                    <td className="mono">{step.instruction}</td>
-                    <td>{step.write}</td>
-                    <td className="mono">{step.t2}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
+              <ol className="study-prediction-history" aria-label="State changes at each predicted rising edge">
+                {predictionResult.history.map((step, index) => (
+                  <li key={`${step.pc}-${index}`}>
+                    <dl>
+                      <div><dt>Rising edge</dt><dd>{index + 1}</dd></div>
+                      <div><dt>PC</dt><dd className="mono">{formatValue(step.pc, 'hex')}</dd></div>
+                      <div><dt>Instruction</dt><dd className="mono">{step.instruction}</dd></div>
+                      <div><dt>Register write</dt><dd>{step.write}</dd></div>
+                      <div><dt>t2 after edge</dt><dd className="mono">{step.t2}</dd></div>
+                    </dl>
+                  </li>
+                ))}
+              </ol>
               <p className="study-prediction-explanation">t2 changes only when a rising edge writes x7. Writes to other registers leave it unchanged; the self-branching stop loop writes no register and holds the architectural state.</p>
             </div>
           </div>}
@@ -559,7 +559,8 @@ function FactorialMode({ onAttempt }: Pick<ModeProps, 'onAttempt'>) {
 }
 
 export function StudyLab(props: StudyLabProps) {
-  if (props.topic === 'clock') return <ClockMode onAttempt={props.onAttempt} />;
-  if (props.topic === 'oral') return <OralMode onAttempt={props.onAttempt} />;
-  return <FactorialMode onAttempt={props.onAttempt} />;
+  const lesson = useLesson(props.topic);
+  if (props.topic === 'clock') return <ClockMode onAttempt={props.onAttempt} lesson={lesson} />;
+  if (props.topic === 'oral') return <OralMode onAttempt={props.onAttempt} lesson={lesson} />;
+  return <FactorialMode onAttempt={props.onAttempt} lesson={lesson} />;
 }

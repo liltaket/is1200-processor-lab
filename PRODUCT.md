@@ -34,7 +34,12 @@ Downloads/lab4-processor-design.pdf (12 pages, 2026), lecture9.pdf (43 pages), r
 - Welcome learners with one clear Open lab action before topic navigation.
 - Practice does not reveal answer hints automatically; learners check or request an answer explicitly.
 - Instruction-field placement supports pointer drag, tap selection, and keyboard operation.
-- Keep example, progress, and supporting help details closed until the learner opens them; show a scroll cue only when an instruction strip overflows.
+- Keep curriculum completion separate from prediction accuracy: lessons record not started, reviewed, or solved by a correct prediction or oral self-assessment, while answer accuracy remains local legacy progress.
+- Keep the course finite and ordered: eleven topic banks contain 120 lesson slots, with each topic's cursor stored separately from its completion statuses.
+- Where a number question allows it, offer answer choices alongside optional custom decimal, hexadecimal, or binary entry.
+- Offer a dedicated progress view with direct exercise links and an explicit, scoped reset confirmation.
+- Preserve a learner's current place within each topic when navigating away and back.
+- Keep example and supporting help details closed until the learner opens them.
 - Prioritize working, coherent learning modes over feature count.
 - Preserve course scope and identify authored examples.
 

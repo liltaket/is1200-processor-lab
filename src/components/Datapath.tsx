@@ -29,7 +29,34 @@ export function Datapath({ trace, revealed, base = 'decimal', onSelect }: Datapa
   const control = (key: string, used = true) => !used ? 'wire control-wire inactive-wire' : known(key) ? 'wire control-wire is-revealed' : 'wire control-wire';
   const click = (id: string) => ({ role: 'button' as const, tabIndex: 0, onClick: () => onSelect?.(id), onKeyDown: (event: React.KeyboardEvent<SVGGElement>) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(id); } }, 'aria-label': `Explore ${COMPONENT_INFO[id]?.title ?? id}` });
   const tag = (x: number, y: number, title: string, text: string, cls = '') => <g className={`wire-tag ${cls}`} transform={`translate(${x} ${y})`}><text className="wire-label" y={-10}>{title}</text><text className="wire-value" y={8}>{text}</text></g>;
-  return <><p className="diagram-pan-note">Scroll sideways for the whole diagram.</p><div className="diagram-scroll" tabIndex={0} role="region" aria-label="Datapath diagram, scroll sideways to explore"><svg className="datapath-svg" viewBox="0 0 1000 510" aria-labelledby="datapath-title datapath-description">
+  const compactValue = (key: string, n: number, short = false) => {
+    const displayed = value(key, n, short);
+    return displayed !== '?' && displayed !== 'unused' && !short ? formatValue(n, base) : displayed;
+  };
+  const flowNode = (id: string, title: string, signals: [string, string][], kind = 'data') => <button type="button" className={`flow-node flow-${kind}`} onClick={() => onSelect?.(id)} aria-label={`Explore ${COMPONENT_INFO[id]?.title ?? title}`}><strong>{title}</strong>{signals.map(([label, shown]) => <span className="flow-signal" key={label}><span>{label}</span><code>{shown}</code></span>)}</button>;
+  return <div className="datapath-responsive"><div className="compact-datapath" role="group" aria-label="Processor signal flow">
+    {flowNode('pc', 'PC and PC + 4', [['PC', String(trace.pc)], ['PC + 4', value('pc-plus-four', trace.pcPlus4, true)]], 'state')}
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    {flowNode('rom', 'Instruction ROM', [['PC >> 2', value('rom-address', trace.romAddress, true)], ['Instruction', known('instruction') ? trace.instruction.name : '?']])}
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    <div className="flow-parallel">
+      {flowNode('decoder', 'Register addresses', [['A1', value('rs1-address', trace.instruction.a1, true)], ['A2', value('rs2-address', trace.instruction.a2, true)], ['A3', trace.writeRegister === null ? 'unused' : value('rd-address', trace.writeRegister, true)]])}
+      {flowNode('control', 'Control unit', [['RegWrite → WE3', value('regwrite', trace.control.regWrite, true)], ['ALUSrc', value('alusrc-control', trace.control.aluSrc, true)], ['ALUControl', known('alu-function') ? trace.control.aluControl : '?'], ['Branch', value('branch-enable', trace.control.branch, true)]], 'control')}
+    </div>
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    <div className="flow-parallel">
+      {flowNode('register-file', 'Register file', [['RD1 → A', compactValue('read-rs1', trace.rd1)], ['RD2', compactValue('read-rs2', trace.rd2)], ['WD3', trace.control.regWrite ? compactValue('alu-result', trace.writeData) : 'unused']], 'state')}
+      {flowNode('immediate', 'Immediate', [['Signed value', compactValue('immediate', trace.immediate)]])}
+    </div>
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    {flowNode('mux', 'ALUSrc mux', [['Select', value('alusrc-control', trace.control.aluSrc, true)], ['B', compactValue('alusrc', trace.aluB)]])}
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    {flowNode('alu', 'ALU', [['ALUControl', known('alu-function') ? trace.control.aluControl : '?'], ['Y', compactValue('alu-result', trace.aluResult)], ['Zero', value('zero-flag', trace.zero, true)]])}
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    {flowNode('branch', 'Branch AND Zero', [['Branch', value('branch-enable', trace.control.branch, true)], ['Zero', value('zero-flag', trace.zero, true)], ['Taken', known('branch-decision') ? String(Number(trace.branchTaken)) : '?'], ['Target = PC + offset', value('branch-target', trace.branchTarget, true)]], 'control')}
+    <span className="flow-arrow" aria-hidden="true">↓</span>
+    {flowNode('pc-mux', 'PC mux · pending state', [['PCnext', value('next-pc', trace.pcNext, true)]], 'state')}
+  </div><div className="diagram-full" role="group" aria-label="Full processor datapath"><svg className="datapath-svg" viewBox="0 0 1000 510" aria-labelledby="datapath-title datapath-description">
     <title id="datapath-title">Interactive Lab 4 single-cycle datapath</title><desc id="datapath-description">PC selects an instruction ROM word through shift right by two. Fields select registers and controls. Register data or immediate feeds the ALU. Branch AND Zero selects PCnext; PC and register writes occur at the rising clock edge. Click components for explanations. A signal table follows the diagram.</desc>
     <defs><marker id="data-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke" /></marker></defs>
     <path d="M105 255H175" className={active('rom-address')} markerEnd="url(#data-arrow)" />
@@ -87,5 +114,5 @@ export function Datapath({ trace, revealed, base = 'decimal', onSelect }: Datapa
     {tag(734, 112, 'Target', value('branch-target', trace.branchTarget, true))}
     {tag(837, 467, 'PCnext · at rising edge', value('next-pc', trace.pcNext, true))}
     <text className="diagram-caption" x="58" y="363">STATE</text><text className="diagram-caption" x="193" y="347">FETCH</text><text className="diagram-caption" x="445" y="375">READ / WRITE</text><text className="diagram-caption" x="749" y="352">EXECUTE</text>
-  </svg></div></>;
+  </svg></div></div>;
 }

@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { createState, encode, generateScenario, toSigned, traceCycle, traceSteps } from '../../src/engine';
+import { createState, encode, generateScenario, INSTRUCTIONS, parseValue, toSigned, toUnsigned, traceCycle, traceSteps } from '../../src/engine';
+import type { Topic } from '../../src/engine';
+import { COURSE_COOKIE, emptyCourse, lessonRandom, serializeCourse } from '../../src/course';
+import { CLOCK_EVENTS } from '../../src/learning';
 
 function firstBeqSteps() {
   const state = createState();
@@ -16,6 +19,44 @@ function responseFor(answer: string, id: string): string {
   if (['regwrite', 'branch-enable', 'zero-flag', 'branch-decision'].includes(id)) return answer.startsWith('Yes') ? 'Yes' : 'No';
   if (id === 'clock-boundary') return answer;
   return answer.match(/^-?\d+/)?.[0] ?? answer;
+}
+
+async function seedCourse(page: import('@playwright/test').Page, topic: Topic, cursor = 0, outcomes: Record<number, 1 | 2> = {}) {
+  const progress = emptyCourse();
+  progress[topic].cursor = cursor;
+  for (const [index, outcome] of Object.entries(outcomes)) progress[topic].results[Number(index)] = outcome;
+  const baseURL = process.env.TEST_BASE_URL || 'http://127.0.0.1:4180';
+  const base = new URL(baseURL.endsWith('/') ? baseURL : `${baseURL}/`);
+  await page.context().addCookies([{ name: COURSE_COOKIE, value: encodeURIComponent(serializeCourse(progress)), domain: base.hostname, path: base.pathname, secure: base.protocol === 'https:', sameSite: 'Lax' }]);
+}
+
+async function chooseNumber(page: import('@playwright/test').Page | import('@playwright/test').Locator, label: string, value: number) {
+  await page.getByLabel(label).selectOption(String(toSigned(value)));
+}
+
+function branchLessonTrace(index = 0) {
+  const plans = [
+    { equal: true, pc: 240, offset: 16 }, { equal: false, pc: 12, offset: -8 }, { equal: false, pc: 252, offset: 8 },
+    { equal: true, pc: 16, offset: -8 }, { equal: false, pc: 8, offset: -16 }, { equal: true, pc: 236, offset: 20 },
+    { equal: false, pc: 20, offset: 4 }, { equal: true, pc: 4, offset: -4 },
+  ];
+  const plan = plans[Math.min(index, plans.length - 1)];
+  const state = createState('lab');
+  state.pc = plan.pc;
+  const rs1 = 1 + (index % 7);
+  const rs2 = (rs1 % 7) + 1;
+  const left = toUnsigned(Math.floor(lessonRandom('branch', index)() * 41) - 16);
+  state.registers[rs1] = left;
+  state.registers[rs2] = plan.equal ? left : toUnsigned(toSigned(left) + 1);
+  const instruction = { name: 'beq' as const, rs1, rs2, imm: plan.offset };
+  return traceCycle(state, encode(instruction));
+}
+
+function romLessonTrace(index = 1) {
+  const pcs = [12, 4, 28, 64, 128, 192, 248, 252];
+  const scenario = generateScenario('add', lessonRandom('rom', index));
+  scenario.state.pc = pcs[Math.min(index, pcs.length - 1)];
+  return traceCycle(scenario.state, scenario.word);
 }
 
 async function placeField(page: import('@playwright/test').Page, format: string, range: string, field: string) {
@@ -47,10 +88,13 @@ test('manual beq keeps the branch target pending until the rising edge', async (
   for (const step of steps) {
     const response = responseFor(step.answer, step.id);
     const choice = exercise.getByRole('button', { name: response, exact: true });
-    if (await choice.count()) {
-      await choice.click();
+    if (await choice.count()) await choice.click();
+    else if (['rs1-address', 'rs2-address', 'rd-address'].includes(step.id)) {
+      const register = step.answer.match(/\(x(\d+)\)/)?.[1];
+      if (!register) throw new Error(`Missing register number in ${step.answer}`);
+      await exercise.getByLabel('Your prediction').selectOption(`x${register}`);
     } else {
-      await exercise.getByRole('textbox', { name: 'Your prediction' }).fill(response);
+      await chooseNumber(exercise, 'Your prediction', parseValue(step.answer.split(' ')[0]));
     }
     await exercise.getByRole('button', { name: 'Check prediction' }).click();
     await expect(exercise.locator('.feedback.correct strong')).toHaveText('Correct');
@@ -62,9 +106,11 @@ test('manual beq keeps the branch target pending until the rising edge', async (
   await expect(exercise.locator('.pending-pc')).toContainText('12');
   await expect(exercise.locator('.pending-pc')).toContainText('4');
   await expect(page.locator('.state-boundary')).toContainText('Before rising edge');
+  await expect(exercise.getByRole('button', { name: 'Tick rising edge' })).toBeFocused();
   await exercise.getByRole('button', { name: 'Tick rising edge' }).click();
   await expect(page.locator('.state-boundary')).toContainText('Rising edge applied');
   await expect(page.getByRole('heading', { name: 'One cycle, completed.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Next exercise' })).toBeFocused();
   await expect(page.locator('.context-pc')).toContainText('PC before edge');
   await expect(page.locator('.state-boundary')).toContainText('Rising edge applied');
   await expect(page.locator('details.signal-details')).not.toHaveAttribute('open', '');
@@ -74,15 +120,21 @@ test('manual beq keeps the branch target pending until the rising edge', async (
   await expect(page.locator('.register-cell').filter({ hasText: 't0' })).toContainText('4');
   await expect(page.locator('.register-cell').filter({ hasText: 't1' })).toContainText('4');
   await expect(page.locator('.register-cell').filter({ hasText: 'zero' })).toContainText('0');
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 2 of 9');
+  await expect(page.locator('.trace-context .instruction-context code')).not.toHaveText('beq t0, t1, -8');
 });
 
 test('clock timing choices freeze after grading', async ({ page }) => {
   await page.goto('./#/clock');
-  await page.getByRole('button', { name: 'Rising clock edge' }).click();
+  await expect(page.locator('.study-prompt')).toContainText(CLOCK_EVENTS[0].event);
+  await page.getByRole('button', { name: 'Immediate propagation' }).click();
   await page.getByRole('button', { name: 'Check timing' }).click();
+  await expect(page.getByRole('status')).toContainText('Correct.');
   await expect(page.getByRole('button', { name: 'Rising clock edge' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Immediate propagation' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Next event' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await expect(page.locator('.study-prompt')).toContainText(CLOCK_EVENTS[1].event);
 });
 
 test('oral guide can be revealed and self-graded once', async ({ page }) => {
@@ -95,16 +147,13 @@ test('oral guide can be revealed and self-graded once', async ({ page }) => {
   await expect(page.locator('details.study-source-details')).toContainText('Source');
   await page.getByRole('button', { name: 'Understood' }).click();
   await expect(page.getByRole('button', { name: 'Understood' })).toBeDisabled();
-  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('Oral exam');
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await expect(page.locator('.study-prompt')).not.toHaveText('What does the ALU do, and what results do the Lab 4 function codes select?');
 });
 
-test('factorial examples 0, 3, and 8 run to a self-loop with the expected result', async ({ page }) => {
+test('factorial course advances through inputs 0, 3, and 8 and finishes its series', async ({ page }) => {
   await page.goto('./#/factorial');
-  const input = page.getByLabel('Example input n');
-  for (const [n, expected] of [[0, 1], [3, 6], [8, 40320]]) {
-    await input.selectOption(String(n));
+  for (const [index, expected] of [1, 6, 40320].entries()) {
     await page.getByRole('button', { name: 'Run to stop' }).click();
     await expect(page.getByText(new RegExp(`Stop loop reached.*t2 = ${expected}\\.`))).toBeVisible();
     await expect(page.locator('.study-cpu-readouts')).toContainText(String(expected));
@@ -112,8 +161,20 @@ test('factorial examples 0, 3, and 8 run to a self-loop with the expected result
     await expect(lastEdge).not.toHaveAttribute('open', '');
     await lastEdge.locator('summary').click();
     await expect(lastEdge.locator('.study-last-trace')).toContainText('Last instruction');
-    if (n !== 8) await page.getByRole('button', { name: 'Reset' }).click();
+    await page.getByRole('button', { name: index === 2 ? 'Finish series' : 'Next exercise' }).click();
+    if (index < 2) await expect(page.getByLabel('Example input n')).toHaveValue(String(index + 1));
   }
+  await expect(page.getByRole('heading', { name: 'Series complete' })).toBeVisible();
+  await page.getByRole('button', { name: 'Review series' }).click();
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 1 of 3');
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await page.getByRole('button', { name: 'Finish series' }).click();
+  await expect(page.getByRole('heading', { name: 'Series complete' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Series complete' })).toBeVisible();
+  await page.getByRole('link', { name: 'Next topic' }).click();
+  await expect(page.locator('.breadcrumb')).toContainText('Oral exam');
 });
 
 test('factorial rejects invalid edited source without advancing CPU state', async ({ page }) => {
@@ -136,7 +197,7 @@ test('hex import validates the words and runs to its self-branching stop loop', 
     mimeType: 'text/plain',
     buffer: Buffer.from('00300293\n00900393\n00000063\n'),
   });
-  await expect(page.getByText('known.hex loaded and validated in Lab 4 mode.')).toBeVisible();
+  await expect(page.getByText('known.hex loaded.')).toBeVisible();
   await expect(page.locator('#factorial-source')).toContainText('addi t0, zero, 3');
   await expect(page.locator('#factorial-source')).toContainText('addi t2, zero, 9');
   await page.getByRole('button', { name: 'Run to stop' }).click();
@@ -148,12 +209,14 @@ test('assisted factorial prediction is not counted as a correct attempt', async 
   await page.goto('./#/factorial');
   await expect(page.locator('details.study-prediction-panel')).not.toHaveAttribute('open', '');
   await page.getByText('Predict future state', { exact: true }).click();
-  await page.getByRole('button', { name: 'Show value' }).click();
+  await page.getByText('Reveal answer', { exact: true }).click();
+  await page.getByRole('button', { name: 'Show value and trace' }).click();
   await page.getByRole('button', { name: 'Check', exact: true }).click();
   await expect(page.locator('.study-status')).toContainText('assisted or repeated check was not counted');
-  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure').getByText('Factorial', { exact: true })).toBeVisible();
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('Not practiced');
+  await expect(page.getByRole('button', { name: 'Next exercise' })).toBeVisible();
+  await page.goto('./#/progress');
+  await page.locator('.course-topic').filter({ hasText: 'Factorial' }).locator('summary').click();
+  await expect(page.getByRole('link', { name: 'Factorial, exercise 1: reviewed' })).toBeVisible();
 });
 
 test('welcome opens the lab and deep topic hashes survive refresh', async ({ page }) => {
@@ -187,21 +250,70 @@ test('mobile topic menu opens a topic and closes after navigation', async ({ pag
   expect(await page.evaluate(() => location.hash)).toBe('#/branch');
 });
 
-test('recorded progress persists after reload', async ({ page }) => {
+test('solved and reviewed lesson statuses persist in the course cookie', async ({ page, baseURL }) => {
   await page.goto('./#/clock');
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).not.toHaveAttribute('open', '');
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 1 of 14');
   await page.getByRole('button', { name: 'Immediate propagation' }).click();
   await page.getByRole('button', { name: 'Check timing' }).click();
-  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 2 of 14');
+  await page.getByRole('button', { name: 'Rising clock edge' }).click();
+  await page.getByRole('button', { name: 'Check timing' }).click();
+  await expect(page.getByRole('button', { name: 'Next exercise' })).toBeVisible();
+  const courseCookie = (await page.context().cookies()).find((cookie) => cookie.name === COURSE_COOKIE);
+  expect(courseCookie).toBeDefined();
+  const appBase = new URL(baseURL ?? 'http://127.0.0.1:4180');
+  const appPath = new URL('.', appBase.href.endsWith('/') ? appBase.href : `${appBase.href}/`).pathname;
+  expect(courseCookie?.path).toBe(appPath);
+  expect(courseCookie?.sameSite).toBe('Lax');
+  expect(courseCookie?.secure).toBe(appBase.protocol === 'https:');
+  expect(courseCookie?.expires).toBeGreaterThan(Date.now() / 1000 + 350 * 24 * 60 * 60);
+  await page.goto('./#/progress');
+  const clock = page.locator('.course-topic').filter({ hasText: 'Clocking' });
+  await clock.locator('summary').click();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: solved' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 2: reviewed' })).toBeVisible();
   await page.reload();
-  await page.locator('.sidebar-utilities details.progress-disclosure summary').click();
-  await expect(page.locator('.sidebar-utilities details.progress-disclosure')).toContainText('1 attempts');
+  const reloadedClock = page.locator('.course-topic').filter({ hasText: 'Clocking' });
+  await reloadedClock.locator('summary').click();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: solved' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 2: reviewed' })).toBeVisible();
+});
+
+test('progress reset can be canceled or confirmed and survives reload', async ({ page }) => {
+  await seedCourse(page, 'clock', 2, { 0: 2, 1: 1 });
+  await page.goto('./#/progress');
+  const clock = page.locator('.course-topic').filter({ hasText: 'Clocking' });
+  await clock.locator('summary').click();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: solved' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 2: reviewed' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Reset progress' }).click();
+  await expect(page.getByText(/Reset all saved progress\?/)).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: solved' })).toBeVisible();
+
+  await page.evaluate(() => {
+    localStorage.setItem('is1200-learning-progress-v1', JSON.stringify({ version: 1, topics: { clock: { attempts: 5, correct: 2 } }, streak: 2, bestStreak: 4 }));
+    localStorage.setItem('unrelated-app-state', 'keep-me');
+  });
+
+  await page.getByRole('button', { name: 'Reset progress' }).click();
+  await page.getByRole('button', { name: 'Reset all progress' }).click();
+  await expect(page.getByRole('status')).toContainText('All saved progress has been reset');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('is1200-learning-progress-v1') || '{}'))).toEqual({ version: 1, topics: {}, streak: 0, bestStreak: 0 });
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('unrelated-app-state'))).toBe('keep-me');
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: not started' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('progressbar', { name: 'Solved exercises' })).toHaveAttribute('value', '0');
+  const reloadedClock = page.locator('.course-topic').filter({ hasText: 'Clocking' });
+  await reloadedClock.locator('summary').click();
+  await expect(page.getByRole('link', { name: 'Clocking, exercise 1: not started' })).toBeVisible();
 });
 
 test('application stays usable when local storage is blocked', async ({ page }) => {
   await page.addInitScript(() => {
-    Object.defineProperty(window, 'localStorage', { configurable: true, get() { throw new DOMException('blocked'); } });
+    Object.defineProperty(Document.prototype, 'cookie', { configurable: true, get() { throw new DOMException('blocked'); }, set() { throw new DOMException('blocked'); } });
   });
   await page.goto('./#/datapath');
   await expect(page.locator('.breadcrumb')).toContainText('Datapath');
@@ -229,7 +341,9 @@ test('SVG datapath component can be opened with Enter', async ({ page }) => {
 
 test('register reads change immediately and writes to x0 remain ignored', async ({ page }) => {
   await page.goto('./#/registers');
-  await expect(page.locator('details.trainer-extra').filter({ hasText: 'Practice a write' })).not.toHaveAttribute('open', '');
+  const experiment = page.locator('details.trainer-extra').filter({ hasText: 'Experiment with registers' });
+  await expect(experiment).not.toHaveAttribute('open', '');
+  await experiment.locator('summary').click();
   await expect(page.locator('.trainer-read-ports')).toContainText('42');
   await page.getByLabel('A1 · read address 1').selectOption('6');
   await expect(page.locator('.trainer-read-ports')).toContainText('-19');
@@ -243,9 +357,10 @@ test('register reads change immediately and writes to x0 remain ignored', async 
 
 test('ALU grades a signed overflow result as a wrapped 32-bit value', async ({ page }) => {
   await page.goto('./#/alu');
-  await page.getByLabel('Predicted Y').fill('-2147483648');
+  await page.getByLabel('Predicted Y · 32-bit result').selectOption('typed');
+  await page.getByLabel('Predicted Y · 32-bit result (typed)').fill('-2147483648');
   await page.getByLabel('Predicted Zero').selectOption('0');
-  await page.getByRole('button', { name: 'Check outputs' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: '-2147483648' })).toBeVisible();
 });
@@ -260,17 +375,18 @@ test('control exercise distinguishes encoded fields from four generated signals'
       ? { opcode: '0x00000013', regWrite: '1', aluSrc: '1', branch: '0', aluControl: '000' }
       : { opcode: '0x00000033', regWrite: '1', aluSrc: '0', branch: '0', aluControl: '000' };
   for (const [label, value] of Object.entries(values)) await page.getByLabel(label === 'opcode' ? 'Encoded opcode' : label === 'aluControl' ? 'ALUControl' : label === 'regWrite' ? 'RegWrite' : label === 'aluSrc' ? 'ALUSrc' : 'Branch').selectOption(value);
-  await page.getByRole('button', { name: 'Check controls' }).click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await expect(page.locator('details.trainer-extra').filter({ hasText: 'How the decoder works' })).not.toHaveAttribute('open', '');
   await page.getByText('How the decoder works', { exact: true }).click();
   for (const name of ['RegWrite', 'ALUSrc', 'Branch', 'ALUControl']) {
     await expect(page.locator('.trainer-signal-table')).toContainText(name);
   }
+  await page.getByRole('button', { name: 'Next exercise' }).click();
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 2 of 9');
 });
 
 test('format field placement grades the complete R-type bit layout', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
   await expect(page.locator('.trainer-instruction-sample code')).toContainText('add ');
   const slots = [
@@ -286,7 +402,6 @@ test('format field placement grades the complete R-type bit layout', async ({ pa
 });
 
 test('completed but incorrect field placement can be checked and graded', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
   const slots = [
     ['31:25', 'funct7'], ['24:20', 'rs2'], ['19:15', 'rs1'],
@@ -300,7 +415,6 @@ test('completed but incorrect field placement can be checked and graded', async 
 });
 
 test('field bank supports tap, keyboard placement, and moving a unique field', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
   const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
   const bank = page.getByRole('group', { name: 'Available instruction fields' });
@@ -322,7 +436,6 @@ test('field bank supports tap, keyboard placement, and moving a unique field', a
 });
 
 test('mouse pointer can drag an instruction field onto its range', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
   const chip = page.getByRole('group', { name: 'Available instruction fields' }).getByRole('button', { name: 'funct7', exact: true });
   await chip.click();
@@ -335,9 +448,8 @@ test('mouse pointer can drag an instruction field onto its range', async ({ page
 test('touch pointer can drag an instruction field on a narrow screen', async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 1000 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
-  await expect(page.getByText('Scroll sideways for all bit ranges.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'R-type instruction bit fields' })).toBeVisible();
   const chip = page.getByRole('group', { name: 'Available instruction fields' }).getByRole('button', { name: 'funct7', exact: true });
   const slot = page.getByRole('group', { name: 'R-type instruction bit fields' }).locator('[data-slot-range="31:25"]');
   await chip.scrollIntoViewIfNeeded();
@@ -353,8 +465,34 @@ test('touch pointer can drag an instruction field on a narrow screen', async ({ 
   await context.close();
 });
 
+test('tablet taps place a field, choose a ROM value, check, advance, and open progress @tablet', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: { width: 768, height: 1024 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.goto('./#/formats');
+  const bank = page.getByRole('group', { name: 'Available instruction fields' });
+  const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
+  await bank.getByRole('button', { name: 'funct7', exact: true }).tap();
+  await strip.locator('[data-slot-range="31:25"]').tap();
+  await expect(strip.locator('[data-slot-range="31:25"]')).toHaveAccessibleName('Bits 31:25; assigned funct7');
+
+  const trace = romLessonTrace(0);
+  await page.goto('./#/rom');
+  const answer = page.getByLabel('Which ROM word index does this PC select?');
+  await answer.tap();
+  await answer.selectOption(String(toSigned(trace.romAddress)));
+  await page.getByRole('button', { name: 'Check answer' }).tap();
+  await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
+  await page.getByRole('button', { name: 'Next exercise' }).tap();
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 2 of 8');
+
+  const menu = page.locator('details.topic-menu');
+  await menu.locator('summary').tap();
+  await menu.getByRole('link', { name: /Progress/ }).tap();
+  await expect(page.locator('.breadcrumb')).toHaveText('Your progress');
+  await context.close();
+});
+
 test('guided instruction fields reveal the mapping without scoring practice', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/formats');
   await page.getByRole('button', { name: 'Guided lesson' }).click();
   const strip = page.getByRole('group', { name: 'R-type instruction bit fields' });
@@ -363,9 +501,11 @@ test('guided instruction fields reveal the mapping without scoring practice', as
 });
 
 test('B-format assembly and scattered immediate bits are visible', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0.99; });
+  const labNames = Object.values(INSTRUCTIONS).filter((item) => item.scope === 'lab').map((item) => item.name);
+  const beqIndex = labNames.indexOf('beq');
+  await seedCourse(page, 'formats', beqIndex);
   await page.goto('./#/formats');
-  const scenario = generateScenario('beq', () => 0.99);
+  const scenario = generateScenario('beq', lessonRandom('formats', beqIndex));
   expect(scenario.instruction.name).toBe('beq');
   await expect(page.locator('.trainer-instruction-sample code')).toContainText('beq ');
 
@@ -391,9 +531,8 @@ test('B-format assembly and scattered immediate bits are visible', async ({ page
 });
 
 test('encoding exercise grades all five stages through the shared encoder', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/encoding');
-  const scenario = generateScenario('add', () => 0);
+  const scenario = generateScenario('add', lessonRandom('encoding', 0));
   await page.getByLabel('Instruction format family').selectOption('R');
   await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
@@ -420,9 +559,8 @@ test('encoding exercise grades all five stages through the shared encoder', asyn
 });
 
 test('encoding field placement can submit a complete incorrect arrangement', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0; });
   await page.goto('./#/encoding');
-  const scenario = generateScenario('add', () => 0);
+  const scenario = generateScenario('add', lessonRandom('encoding', 0));
   await page.getByLabel('Instruction format family').selectOption('R');
   await page.getByRole('button', { name: 'Check answer' }).click();
   await page.getByRole('button', { name: 'Next step' }).click();
@@ -446,18 +584,16 @@ test('encoding field placement can submit a complete incorrect arrangement', asy
 });
 
 test('branch prediction checks control, comparison, byte target, and selected next PC', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0.5; });
   await page.goto('./#/branch');
   await expect(page.locator('details.trainer-extra').filter({ hasText: 'Follow the branch path' })).not.toHaveAttribute('open', '');
-  const scenario = generateScenario('beq', () => 0.5);
-  const trace = traceCycle(scenario.state, scenario.word);
-  await page.getByLabel('SUB result · ALU Y').fill(String(toSigned(trace.aluResult)));
+  const trace = branchLessonTrace();
+  await chooseNumber(page, 'SUB result · ALU Y', trace.aluResult >>> 0);
   await page.getByLabel('ALU Zero').selectOption(String(trace.zero));
   await page.getByLabel('Branch control enabled?').selectOption('1');
   await page.getByLabel('Is the branch taken?').selectOption(trace.branchTaken ? 'yes' : 'no');
-  await page.getByLabel('Branch target · byte address').fill(String(trace.branchTarget));
-  await page.getByLabel('PC+4 · byte address').fill(String(trace.pcPlus4));
-  await page.getByLabel('PCnext · byte address').fill(String(trace.pcNext));
+  await chooseNumber(page, 'Branch target · byte address', trace.branchTarget >>> 0);
+  await chooseNumber(page, 'PC+4 · byte address', trace.pcPlus4 >>> 0);
+  await chooseNumber(page, 'PCnext · byte address', trace.pcNext >>> 0);
   await page.getByRole('button', { name: 'Check branch' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await page.getByText('Follow the branch path', { exact: true }).click();
@@ -465,34 +601,125 @@ test('branch prediction checks control, comparison, byte target, and selected ne
 });
 
 test('ROM exercise converts a nonzero byte PC to its word index', async ({ page }) => {
-  await page.addInitScript(() => { Math.random = () => 0.5; });
+  await seedCourse(page, 'rom', 1);
   await page.goto('./#/rom');
   await expect(page.locator('details.trainer-extra').filter({ hasText: 'Why divide by four?' })).not.toHaveAttribute('open', '');
-  const scenario = generateScenario('add', () => 0.5);
-  const trace = traceCycle(scenario.state, scenario.word);
+  const trace = romLessonTrace(1);
   expect(trace.pc).toBeGreaterThan(0);
   expect(trace.romAddress).toBe(trace.pc / 4);
   await page.getByText('Why divide by four?', { exact: true }).click();
   await expect(page.locator('.trainer-rom-fetch')).toContainText(`0x${trace.pc.toString(16).padStart(2, '0').toUpperCase()}`);
-  await page.getByLabel('Which ROM word index does this PC select?').fill(String(trace.romAddress));
-  await page.getByRole('button', { name: 'Check ROM address' }).click();
+  await chooseNumber(page, 'Which ROM word index does this PC select?', trace.romAddress);
+  await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
   await expect(page.locator('.trainer-rom-fetch')).toContainText(String(trace.romAddress));
 });
 
-test('all topic views fit without document overflow at 390px and 1024px', async ({ page }) => {
+test('keyboard-only ROM answer can be checked and advanced', async ({ page }) => {
+  await page.goto('./#/welcome');
+  for (let index = 0; index < 12 && !(await page.getByRole('link', { name: 'Open lab' }).evaluate((element) => element === document.activeElement)); index++) await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Open lab' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  for (let index = 0; index < 70; index++) {
+    const focusedHref = await page.evaluate(() => document.activeElement?.getAttribute('href') ?? '');
+    if (focusedHref === '#/rom') break;
+    await page.keyboard.press('Tab');
+  }
+  const romLink = page.locator('.desktop-topics').getByRole('link', { name: 'PC and ROM' });
+  await expect(romLink).toBeFocused();
+  await page.keyboard.press('Enter');
+  const answer = page.getByLabel('Which ROM word index does this PC select?');
+  const expectedWord = romLessonTrace(0).romAddress;
+  for (let index = 0; index < 80 && !(await answer.evaluate((element) => element === document.activeElement)); index++) await page.keyboard.press('Tab');
+  await expect(answer).toBeFocused();
+  const optionIndex = await answer.locator('option').evaluateAll((options, expected) => options.findIndex((option) => (option as HTMLOptionElement).value === String(expected)), expectedWord);
+  expect(optionIndex).toBeGreaterThan(0);
+  await answer.press(String(expectedWord));
+  await expect(answer).toHaveValue(String(expectedWord));
+  const check = page.getByRole('button', { name: 'Check answer' });
+  await page.keyboard.press('Tab');
+  await expect(check).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Correct' })).toBeVisible();
+  const next = page.getByRole('button', { name: 'Next exercise' });
+  await expect(next).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.lesson-position')).toContainText('Exercise 2 of 8');
+  await expect(page.locator('#main-content')).toBeFocused();
+});
+
+async function openEncodingFields(page: import('@playwright/test').Page) {
+  const scenario = generateScenario('add', lessonRandom('encoding', 0));
+  await page.getByLabel('Instruction format family').selectOption('R');
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
+  await page.getByLabel('Encoded opcode field').selectOption('0x00000033');
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
+  for (const [index, value] of [scenario.instruction.rd!, scenario.instruction.rs1, scenario.instruction.rs2!].entries()) {
+    await page.locator('.trainer-operand-grid select').nth(index).selectOption(String(value));
+  }
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Next step' }).click();
+  await expect(page.getByRole('group', { name: 'R-type instruction bit fields' })).toBeVisible();
+}
+
+test('all course routes and open disclosures stay contained at 390, 768, and 1024px @tablet', async ({ page }) => {
   const topics = [
     ['datapath', 'Datapath'], ['formats', 'Instruction formats'], ['control', 'Control unit'],
     ['registers', 'Register file'], ['alu', 'ALU'], ['branch', 'Branches'], ['clock', 'Clocking'],
     ['encoding', 'Assembly and encoding'], ['rom', 'PC and ROM'], ['factorial', 'Factorial'], ['oral', 'Oral exam'],
   ];
-  for (const width of [390, 1024]) {
+  const routes = [...topics, ['progress', 'Your progress']];
+  for (const width of [390, 768, 1024]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const [topic, title] of topics) {
+    await page.goto('./#/welcome');
+    await expect(page.getByRole('heading', { name: 'Welcome to the lab.' })).toBeVisible();
+    for (const [topic, title] of routes) {
+      if (topic === 'formats') {
+        const labNames = Object.values(INSTRUCTIONS).filter((item) => item.scope === 'lab').map((item) => item.name);
+        await seedCourse(page, 'formats', labNames.indexOf('beq'));
+      }
       await page.goto(`./#/${topic}`);
       await expect(page.locator('.breadcrumb')).toContainText(title);
-      const documentWidth = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth));
-      expect(documentWidth, `${topic} at ${width}px`).toBeLessThanOrEqual(width);
+      const mobileMenu = page.locator('details.topic-menu[open] > summary');
+      if (await mobileMenu.count()) await mobileMenu.click();
+      if (topic === 'encoding') await openEncodingFields(page);
+      if (topic === 'oral') await page.getByRole('button', { name: 'Reveal answer guide' }).click();
+      for (let attempts = 0; attempts < 40; attempts++) {
+        const summary = page.locator('details:not(.topic-menu):visible:not([open]) > summary').first();
+        if (!(await summary.count())) break;
+        await summary.click();
+      }
+      if (topic === 'formats') await expect(page.getByRole('group', { name: 'Available instruction fields' })).toBeVisible();
+      const layout = await page.evaluate(() => {
+        const width = window.innerWidth;
+        const documentWidth = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);
+        const overflowing = Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((element) => {
+          if (!element.clientWidth || element.offsetWidth === 0) return false;
+          if (!element.checkVisibility()) return false;
+          if (element.classList.contains('instruction-visually-hidden')) return false;
+          if (element.matches('input,textarea,select')) return false;
+          const overflowX = getComputedStyle(element).overflowX;
+          return element.scrollWidth > element.clientWidth + 1 && overflowX !== 'auto' && overflowX !== 'scroll';
+        }).slice(0, 12).map((element) => `${element.tagName.toLowerCase()}.${String(element.className).replaceAll(' ', '.')}:${element.scrollWidth}/${element.clientWidth}`);
+        const scrollable = Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((element) => {
+          if (!element.clientWidth || element.offsetWidth === 0 || !element.checkVisibility() || element.matches('input,textarea,select') || element.classList.contains('instruction-visually-hidden')) return false;
+          const style = getComputedStyle(element);
+          return element.scrollWidth > element.clientWidth + 1 && (style.overflowX === 'auto' || style.overflowX === 'scroll');
+        }).slice(0, 12).map((element) => `${element.tagName.toLowerCase()}.${String(element.className).replaceAll(' ', '.')}:${element.scrollWidth}/${element.clientWidth}`);
+        const scrollersOutside = Array.from(document.querySelectorAll<HTMLElement>('body *')).filter((element) => {
+          const style = getComputedStyle(element);
+          if (element.scrollWidth <= element.clientWidth + 1 || (style.overflowX !== 'auto' && style.overflowX !== 'scroll')) return false;
+          const rect = element.getBoundingClientRect();
+          return rect.left < -1 || rect.right > width + 1;
+        }).length;
+        return { width, documentWidth, overflowing, scrollable, scrollersOutside };
+      });
+      expect(layout.documentWidth, `${topic} document at ${width}px`).toBeLessThanOrEqual(width);
+      expect(layout.overflowing, `${topic} internal horizontal overflow at ${width}px`).toEqual([]);
+      expect(layout.scrollable, `${topic} visible horizontal scroll area at ${width}px`).toEqual([]);
+      expect(layout.scrollersOutside, `${topic} scroll area outside viewport at ${width}px`).toBe(0);
     }
   }
 });

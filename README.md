@@ -9,15 +9,17 @@ An interactive study workbench for KTH IS1200 Lab 4 – Processor Design. Decode
 ## Learning modes
 
 - **Manual datapath:** work through a complete `add`, `addi`, or `beq` cycle. Predict the decode and signals before applying the clock edge; stored state changes only at that edge. Click or keyboard-activate components to explore their roles.
-- **Instruction formats and assembly encoding:** place R/I/B fields, then build an instruction through format, opcode, operands, field placement, and hexadecimal word stages. The available fields are alphabetized; place them onto their bit ranges by pointer drag, field selection plus tap, or keyboard activation with Enter. The bit strip scrolls inside its own frame; a visible cue appears when it overflows, and B-type keeps single-bit targets wide enough to select. Practice keeps field hints hidden until you explicitly reveal an answer. Guided lesson cues are unscored.
+- **Instruction formats and assembly encoding:** place R/I/B fields, then build an instruction through format, opcode, operands, field placement, and hexadecimal word stages. The ordered field bank places labels onto exact bit ranges in a responsive grid. Placement supports pointer drag, field selection plus tap, and keyboard activation with Enter. Practice keeps field hints hidden until you explicitly reveal an answer. Guided lesson cues are unscored.
 - **Control, register file, and ALU:** derive generated controls, experiment with immediate reads and pending writes, and predict 32-bit arithmetic/logic results. Subtraction shows conditional XOR inversion and carry-in.
 - **Branches, clocking, and PC/ROM:** distinguish Branch from Branch AND Zero, derive both PC paths, classify timing events, and convert byte PC addresses to word indices.
 - **Factorial/program trace:** edit assembly or import assembly/hex words, step or run a bounded program, and predict register results across instruction edges.
 - **Oral preparation:** explain 32 source-linked prompts in your own words and self-assess against expected concepts. Lab 4 and Lecture 9 scopes are separate.
 
-Start at the welcome screen and choose **Open lab** to begin; a few topic shortcuts are also available there. Each workbench view has one page heading and places the current task before supporting explanation. Practice asks for a prediction before feedback; answer details appear after checking or an explicit reveal. Practice accuracy is saved locally. Mixed review selects less-practiced or lower-accuracy subjects; answers revealed or retried after feedback do not earn additional correct attempts. On small screens, topic navigation, Mixed review, and closed Progress details are in the expandable **Topics** menu.
+Start at the welcome screen and choose **Open lab** to begin; a few topic shortcuts are also available there. Each workbench view has one page heading and places the current task before supporting explanation. Practice asks for a prediction before feedback; answer details appear after checking or an explicit reveal. Use **Progress** to see every topic and its lessons, jump directly to an exercise, and review solved and reviewed counts. Use **Next exercise** after checking a task; **Finish series** opens its summary. Each topic keeps its current lesson cursor when you leave and return. **Reset progress** asks for confirmation and clears course completion and legacy prediction-accuracy history only. On small screens, topic links and Progress are in the expandable **Topics** menu; Escape closes the menu and restores focus to its control.
 
-In Factorial/program trace, choose an example input, inspect the processor state, then tick one rising edge or run to the stop loop. The authored example explanation is inside the closed **Example program** disclosure; edge details appear after the first tick. **Edit program** and **Predict future state** also start closed. Mobile datapaths, instruction strips, and wide prediction tables scroll inside their own panels.
+The fixed curriculum contains 120 lesson slots across 11 topic banks. Lesson status is 0 not started, 1 reviewed, or 2 solved (correct prediction or self-rated understanding); recording an existing or lower outcome does not erase a stronger result. Number-answer tasks use selectable choices and, where enabled, a custom decimal, hexadecimal, or binary response.
+
+In Factorial/program trace, choose an example input, inspect the processor state, then tick one rising edge or run to the stop loop. The authored example explanation is inside the closed **Example program** disclosure; edge details appear after the first tick. **Edit program** and **Predict future state** also start closed. The datapath changes from compact semantic signal buttons to its full SVG when its container reaches 1000 px; both fit without horizontal panning. The instruction-field grid reflows its exact R/I/B ranges to available width. Prediction history uses stacked entries that fit the available width.
 
 ## Local development
 
@@ -37,7 +39,7 @@ npm run preview
 npm run test:e2e
 ```
 
-Browser tests require Playwright Chromium (`npx playwright install chromium`). Progress stays in this browser's localStorage; blocked storage never prevents practicing. Session streaks reset on reload.
+Browser tests require Playwright Chromium and WebKit (`npx playwright install chromium webkit`). Course completion and each topic's lesson cursor are saved in the `processor_lab_course_v1` cookie (version 1, one-year lifetime, app-base-path scoped, SameSite=Lax, Secure on HTTPS). Statuses are 0 not started, 1 reviewed, and 2 solved (correct prediction or self-rated understanding); completion is idempotent. Prediction accuracy and streak data remain separate in localStorage, and blocked storage never prevents practicing.
 
 The browser suite starts its own production preview on strict port 4180 and refuses to reuse another project's server. For a deliberately chosen running server, set `TEST_BASE_URL`. The same tests can verify the published repository subpath:
 
@@ -73,13 +75,13 @@ See [source analysis](docs/SOURCE_ANALYSIS.md), [learning plan](docs/LEARNING_PL
 
 ## Validation
 
-The local acceptance run passed 38 unit tests, 29 Chromium browser tests, strict TypeScript checking, ESLint, and the production build. Browser coverage includes a complete manual cycle, x0, signed overflow, B immediate fragments, correct and incorrect field placement, program import, factorial 0/3/8, saved and blocked storage, and keyboard navigation. All 11 views were checked for document overflow at 390 px and 1024 px. Desktop, tablet, and mobile screenshots received an independent visual review; the remaining field-scroll discovery finding was corrected and the final verdict was clear.
+The course-progress update passes 43 unit tests and 34 browser tests across Chromium and a targeted WebKit tablet project, plus TypeScript, lint and production build. [Validation notes](docs/VALIDATION.md) describe persistence, keyboard/touch and responsive evidence and its limits.
 
 A separate production build with `/subpath-check/` was served by a plain static HTTP server. All 11 hash destinations loaded and survived refresh with assets inside the subpath. This validates static routing locally. The deployment workflow validates the published revision on GitHub before releasing the Pages artifact. See [correctness review](docs/CORRECTNESS_REVIEW.md), [UX review](docs/UX_REVIEW.md), and [design system](DESIGN.md).
 
 ## GitHub Pages deployment
 
-`.github/workflows/pages.yml` automatically deploys **every push to `main`**, including merge commits from PRs. Pull requests targeting `main` run checks without publishing. Tests, TypeScript, ESLint, the production build, and Chromium browser tests must all pass before deployment. You can also run the workflow manually from Actions on `main`. Action revisions are pinned; the repository Pages source is **GitHub Actions**.
+`.github/workflows/pages.yml` automatically deploys **every push to `main`**, including merge commits from PRs. Pull requests targeting `main` run checks without publishing. Tests, TypeScript, ESLint, the production build, and Chromium/WebKit browser tests must all pass before deployment. You can also run the workflow manually from Actions on `main`. Action revisions are pinned; the repository Pages source is **GitHub Actions**.
 
 The workflow obtains the Pages base path from `configure-pages`. Locally, relative asset paths are used; override them for a subpath build:
 
